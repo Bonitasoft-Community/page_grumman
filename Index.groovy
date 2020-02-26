@@ -45,7 +45,7 @@ import org.bonitasoft.engine.session.APISession;
 
 public class Index implements PageController {
 
-	private static String pageName="ping";
+	private static String pageName="grumman";
 	private static Logger loggerCustomPage= Logger.getLogger("org.bonitasoft.custompage."+pageName+".groovy");
 	
 	

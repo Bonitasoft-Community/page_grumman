@@ -83,7 +83,8 @@ import org.bonitasoft.log.event.BEvent.Level;
 import org.bonitasoft.log.event.BEventFactory;
 
 import org.bonitasoft.grumman.GrummanAPI;
-
+import org.bonitasoft.grumman.GrummanAPI.MessagesList;
+import org.bonitasoft.grumman.GrummanAPI.MessagesIdList;
 import org.bonitasoft.engine.service.TenantServiceAccessor;
 import org.bonitasoft.engine.service.TenantServiceSingleton;
 
@@ -92,7 +93,7 @@ import org.bonitasoft.engine.service.TenantServiceSingleton;
 
 public class Actions {
 
-    private static Logger logger= Logger.getLogger("org.bonitasoft.custompage.longboard.groovy");
+    private static Logger logger= Logger.getLogger("org.bonitasoft.custompage.grumman.groovy");
     
     
     private static EVENT_FAKE_ERROR  = new BEvent("com.bonitasoft.custompage.grumman", 1, Level.APPLICATIONERROR, "Fake error", "This is not a real error", "No consequence", "don't call anybody");
@@ -117,7 +118,7 @@ public class Actions {
           
         try {
             String action=request.getParameter("action");
-            logger.info("#### log:Actions  action is["+action+"] !");
+            logger.info("#### log:Actions  action is["+action+"] json="+paramJsonSt);
             if (action==null || action.length()==0 )
             {
                 actionAnswer.isManaged=false;
@@ -150,12 +151,61 @@ public class Actions {
                 int numberOfMessages =  Integer.parseInt( request.getParameter("numberofmessages"));
 
                 actionAnswer.setResponse( grummanAPI.getIncompleteReconciliationMessage( numberOfMessages, processAPI));
+            }
+            
+            else if ("collect_reset".equals(action))
+            {
+                String paramJsonPartial = request.getParameter("paramjson");
+                if (paramJsonPartial==null)
+                    paramJsonPartial="";
+                logger.info("   collect_reset paramjson="+paramJsonPartial);
+                    
+                httpSession.setAttribute("accumulate", paramJsonPartial );
+                actionAnswer.responseMap.put("status", "ok");
 
+            }
+            else if ("collect_add".equals(action))
+            {
+                String paramJsonPartial = request.getParameter("paramjson");
+                logger.info("collect_add paramJsonPartial=["+paramJsonPartial+"] json=["+paramJsonSt+"]");
 
+                String accumulateJson = (String) httpSession.getAttribute("accumulate" );
+                accumulateJson+=paramJsonSt;
+                httpSession.setAttribute("accumulate", accumulateJson );
+                actionAnswer.responseMap.put("status", "ok");
+
+            }
+
+            else if ("sendincompletemessage".equals(action))
+            {                
+                String accumulateJson = (String) httpSession.getAttribute("accumulate" );
+                logger.info("collect_finish json=["+accumulateJson+"] ");
+                MessagesList messagesList = MessagesList.getInstanceFromJson( accumulateJson );
+                actionAnswer.setResponse( grummanAPI.sendIncompleteReconcialiationMessage( messagesList, processAPI));
+            }
+            else if ("getpurgetablesmonitoring".equals(action))
+            {
+                actionAnswer.setResponse( grummanAPI.getPurgeTablesMonitoring( processAPI));
+            }
+            else if ("purgetablesmonitoring".equals(action))
+            {
+                actionAnswer.setResponse( grummanAPI.purgeTablesMonitoring( processAPI));
+            }
+            else if ("getlistduplicatemessages".equals(action))
+            {
+                int maximumNumberOfDuplications =  Integer.parseInt( request.getParameter("maximumnumberofduplications"));
+                
+                actionAnswer.setResponse( grummanAPI.getListDuplicateMessages(maximumNumberOfDuplications, processAPI));
+            }
+            else if ("deleteduplicatemessages".equals(action))
+            {
+                String accumulateJson = (String) httpSession.getAttribute("accumulate" );
+                logger.info("collect_finish json=["+accumulateJson+"] ");
+                MessagesIdList listIds = MessagesIdList.getInstanceFromJson( accumulateJson );
+                actionAnswer.setResponse( grummanAPI.deleteDuplicateMessages(listIds, processAPI));
             } else {
 				listEvents.add( EVENT_FAKE_ERROR);
                 actionAnswer.responseMap.put("listevents",BEventFactory.getHtml( listEvents));
-                
 			}
 			
              
