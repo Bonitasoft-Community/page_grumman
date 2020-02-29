@@ -5,24 +5,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.StringTokenizer;
-import java.util.logging.Logger;
 
-import org.bonitasoft.engine.api.ProcessAPI;
 import org.bonitasoft.engine.bpm.flownode.CorrelationDefinition;
-import org.bonitasoft.engine.bpm.flownode.SendEventException;
-import org.bonitasoft.engine.expression.Expression;
-import org.bonitasoft.engine.expression.ExpressionBuilder;
-import org.bonitasoft.engine.expression.ExpressionType;
-import org.bonitasoft.engine.expression.InvalidExpressionException;
 import org.bonitasoft.engine.operation.Operation;
-import org.bonitasoft.log.event.BEvent;
-import org.bonitasoft.log.event.BEvent.Level;
 
 import lombok.Data;
-import lombok.Getter;
 
 
 
@@ -50,7 +39,7 @@ public  @Data class Message {
      * @author Firstname Lastname
      *
      */
-    public enum enumStatus { INCOMPLETECONTENT, FAILEDDESIGN, COMPLETE, DUPLICATE, SENDED, SENDEDANDPURGE, SENDFAILED, EXECUTED, EXECUTEDFAILED };
+    public enum enumStatus { INCOMPLETECONTENT, FAILEDDESIGN, COMPLETE, DUPLICATE, SENDED, SENDEDANDPURGE, SENDFAILED, EXECUTED, EXECUTEDFAILED }
     private enumStatus status;
     /**
      * theses informations describe the message
@@ -58,7 +47,7 @@ public  @Data class Message {
     private String messageName;
     
     /** correlation : should be same as processName */
-    public String targetProcessName;
+    private String targetProcessName;
     /** correlation : should be same as flowNodeName */
     public String targetFlowNodeName;
     
@@ -94,8 +83,8 @@ public  @Data class Message {
     private String flowNodeName;
     private Long flowNodeInstanceId;
     
-    public boolean isDesignContentFound=false;
-    public enum enumCatchEventType { STARTMESSAGE, TASKMESSAGE, BOUNDARYEVENT, CATCHMESSAGEEVENT, SUBPROCESSEVENT };
+    private boolean isDesignContentFound=false;
+    public enum enumCatchEventType { STARTMESSAGE, TASKMESSAGE, BOUNDARYEVENT, CATCHMESSAGEEVENT, SUBPROCESSEVENT }
     public enumCatchEventType catchEventType;
     public Set<String> designContent = new HashSet<>();
     public Long dateWaitingEvent;
@@ -115,8 +104,8 @@ public  @Data class Message {
     /**
      * before send the message, take a picture of all messageinstances to be deleted
      */
-    public List<Long> listIdMessageInstanceRelative = new ArrayList<Long>();
-    public List<Long> listIdMessageInstanceRelativePurged = new ArrayList<Long>();
+    public List<Long> listIdMessageInstanceRelative = new ArrayList<>();
+    public List<Long> listIdMessageInstanceRelativePurged = new ArrayList<>();
     public Map<String, Object> messageInstanceVariables = new HashMap<>();
 
     /**
@@ -127,12 +116,12 @@ public  @Data class Message {
      */
     public boolean isMessageWithCorrelation = true;
     public List<CorrelationDefinition> listCorrelationDefinitions=null;
-    public List<Operation> listOperations = new ArrayList<Operation>();
+    public List<Operation> listOperations = new ArrayList<>();
     
     /**
      * when the message is incomplete, this is the complete one
      */
-    public Map<String, Object> completeMessage = new HashMap<String,Object>();
+    public Map<String, Object> completeMessage = new HashMap<>();
     public boolean isComplete = true;
 
     public StringBuilder incompleteDetail= new StringBuilder();

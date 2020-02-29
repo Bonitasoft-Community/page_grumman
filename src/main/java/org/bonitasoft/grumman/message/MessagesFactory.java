@@ -476,14 +476,14 @@ public class MessagesFactory {
                     designProcessAPI = processAPI.getDesignProcessDefinition(message.processDefinitionId);
                 } catch (ProcessDefinitionNotFoundException e) {
                     logger.severe(loggerLabel + loggerExceptionLabel + e.toString());
-                    listEvents.add(new BEvent(eventNoProcessDefinitionFound, "ProcessName[" + message.targetProcessName + "] Version[" + message.currentProcessVersion + "]"));
+                    listEvents.add(new BEvent(eventNoProcessDefinitionFound, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.currentProcessVersion + "]"));
                     message.incompleteDetail.append(eventNoProcessDefinitionFound.toString());
                     return listEvents;
                 }
                 catch(Exception e) {
                     // error during the design loading
                     logger.severe(loggerLabel + loggerExceptionLabel + e.toString());
-                    listEvents.add(new BEvent(eventErrorLoadingDesign, "ProcessName[" + message.targetProcessName + "] Version[" + message.currentProcessVersion + "]"));
+                    listEvents.add(new BEvent(eventErrorLoadingDesign, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.currentProcessVersion + "]"));
                     message.incompleteDetail.append(eventErrorLoadingDesign.toString());
                     return listEvents;
                 }
@@ -494,7 +494,7 @@ public class MessagesFactory {
             // maybe an activity or a intermediate catch event, Boundary event, Activity
             ReceiveTaskDefinition activityMessage = null;
 
-            message.isDesignContentFound = false;
+            message.setDesignContentFound( false );
             // avoid the class cast exception
             List<CatchEventDefinition> listCatchsEvent = new ArrayList<>();
 
@@ -508,7 +508,7 @@ public class MessagesFactory {
                     message.setCorrelations(activityMessage.getTrigger().getCorrelations());
                     message.addListOperations(activityMessage.getTrigger().getOperations());
                     message.catchEventType = enumCatchEventType.TASKMESSAGE;
-                    message.isDesignContentFound = true;
+                    message.setDesignContentFound( true );
 
                     detailExecution.append("*MATCH*");
                     break;
@@ -537,7 +537,7 @@ public class MessagesFactory {
 
             
 
-            if (!message.isDesignContentFound) {
+            if (!message.isDesignContentFound() ) {
                 message.incompleteDetail = detailExecution;
                 return listEvents;
             }
@@ -561,7 +561,7 @@ public class MessagesFactory {
             String exceptionDetails = sw.toString();
 
             logger.severe(loggerLabel + loggerExceptionLabel + e.toString()+" at "+exceptionDetails);
-            listEvents.add(new BEvent(eventNoTriggerDefinitionFound, "ProcessName[" + message.targetProcessName + "] Version[" + message.currentProcessVersion + "] FlowNodeName[" + message.targetFlowNodeName + "]"));
+            listEvents.add(new BEvent(eventNoTriggerDefinitionFound, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.currentProcessVersion + "] FlowNodeName[" + message.targetFlowNodeName + "]"));
             message.incompleteDetail.append("Error "+e.getMessage()+" at "+exceptionDetails);
         }
 
@@ -588,7 +588,7 @@ public class MessagesFactory {
                     message.setCorrelations(catchDefinition.getCorrelations());
                     message.addListOperations(catchDefinition.getOperations());
                     message.catchEventType = catchEventType;
-                    message.isDesignContentFound = true;
+                    message.setDesignContentFound( true );
                     detailExecution.append("*MATCH*");
                     break;
                 }
@@ -607,7 +607,7 @@ public class MessagesFactory {
 
         try {
             List<CatchMessageEventTriggerDefinition> listEventsTrigger = catchEventDefinition.getMessageEventTriggerDefinitions();
-            if (listEventsTrigger.size() > 0)
+            if (! listEventsTrigger.isEmpty())
                 return listEventsTrigger.get(0);
 
         } catch (Exception e) {
@@ -630,7 +630,7 @@ public class MessagesFactory {
             // how many waiting_event are present
             // how many message_instance are present
             List<Object> parameters = new ArrayList<>();
-            parameters.add(message.targetProcessName);
+            parameters.add(message.getTargetProcessName());
             parameters.add(message.currentProcessVersion);
             parameters.add(message.targetFlowNodeName);
             for (int i = 0; i < 5; i++)
@@ -640,7 +640,7 @@ public class MessagesFactory {
             listEvents.addAll(resultQuery.listEvents);
 
             parameters.clear();
-            parameters.add(message.targetProcessName);
+            parameters.add(message.getTargetProcessName());
             parameters.add(message.targetFlowNodeName);
             for (int i = 0; i < 5; i++)
                 parameters.add(message.getValueCorrelation(i, true));

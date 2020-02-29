@@ -33,7 +33,7 @@ public class OperationCorrSendCompleteMessage extends OperationCorr {
         ResultOperationCorr resultOperation = new ResultOperationCorr();
         try {
 
-            Expression targetProcess = new ExpressionBuilder().createConstantStringExpression(message.targetProcessName);
+            Expression targetProcess = new ExpressionBuilder().createConstantStringExpression(message.getTargetProcessName());
             Expression targetFlowNode = new ExpressionBuilder().createConstantStringExpression(message.targetFlowNodeName);
             List<ExpressionDescription> listExpressions = new ArrayList<>();
             if (message.completeMessage!=null) {
@@ -72,7 +72,7 @@ public class OperationCorrSendCompleteMessage extends OperationCorr {
                 }
                     
                 Map<Expression, Expression> messageCorrelations = createMapExpression(listExpressions);
-                logger.info( loggerLabel+" Send message["+ message.getMessageName()+"] targetProcess["+ message.targetProcessName+"] FlowName["+ message.targetFlowNodeName+"] RootCaseId["+ message.rootProcessInstanceId+"]"+traceCorrelation);
+                logger.info( loggerLabel+" Send message["+ message.getMessageName()+"] targetProcess["+ message.getTargetProcessName()+"] FlowName["+ message.targetFlowNodeName+"] RootCaseId["+ message.rootProcessInstanceId+"]"+traceCorrelation);
                 processAPI.sendMessage( message.getMessageName(), targetProcess, targetFlowNode, messageContent, messageCorrelations);
                 
                 

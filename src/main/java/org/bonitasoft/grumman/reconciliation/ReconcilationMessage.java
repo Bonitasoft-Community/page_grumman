@@ -64,7 +64,7 @@ public class ReconcilationMessage {
             Map<String, Object> result = new HashMap<>();
             Map<String, List<Message>> mapMessages = new HashMap<>();
             for (Message message : listMessages) {
-                String key = message.targetProcessName + "#" + message.currentProcessVersion + "#" + message.targetFlowNodeName + "#" + message.getStatus().toString();
+                String key = message.getTargetProcessName() + "#" + message.currentProcessVersion + "#" + message.targetFlowNodeName + "#" + message.getStatus().toString();
                 List<Message> list = mapMessages.containsKey(key) ? mapMessages.get(key) : new ArrayList<>();
                 list.add(message);
                 mapMessages.put(key, list);
@@ -72,7 +72,7 @@ public class ReconcilationMessage {
             List<Map<String, Object>> listMessageGroupBy = new ArrayList<>();
             for (List<Message> listMessage : mapMessages.values()) {
                 Map<String, Object> oneSynthesis = new HashMap<>();
-                oneSynthesis.put("processname", listMessage.get(0).targetProcessName);
+                oneSynthesis.put("processname", listMessage.get(0).getTargetProcessName());
                 oneSynthesis.put("processversion", listMessage.get(0).currentProcessVersion);
                 oneSynthesis.put("flowname", listMessage.get(0).targetFlowNodeName);
                 oneSynthesis.put(GrummanAPI.CSTJSON_STATUS, listMessage.get(0).getStatusForJson());
@@ -185,12 +185,12 @@ public class ReconcilationMessage {
             perfDesign.stop();
 
             if (!listEventDesign.isEmpty()) {
-                String keyEvent = message.targetProcessName + "#" + message.currentProcessVersion + "#" + message.targetFlowNodeName;
+                String keyEvent = message.getTargetProcessName() + "#" + message.currentProcessVersion + "#" + message.targetFlowNodeName;
                 if (!filterOnEventProcess.contains(keyEvent))
                     result.listEvents.addAll(listEventDesign);
                 filterOnEventProcess.add(keyEvent);
             }
-            if (!message.isDesignContentFound)
+            if (!message.isDesignContentFound() )
                 message.setStatus(enumStatus.FAILEDDESIGN);
             else {
                 message.completeMessage.clear();
