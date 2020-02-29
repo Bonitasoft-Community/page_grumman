@@ -43,10 +43,9 @@ import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.Reconcialiatio
 import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.ReconcialiationFilter.TYPEFILTER;
 import org.bonitasoft.log.event.BEvent;
 import org.bonitasoft.log.event.BEvent.Level;
-
-import sun.misc.PerformanceLogger;
-
 import org.bonitasoft.log.event.BEventFactory;
+
+import lombok.Data;
 
 public class MessagesFactory {
 
@@ -61,6 +60,7 @@ public class MessagesFactory {
     private final static BEvent eventNoTriggerDefinitionFound = new BEvent(MessagesFactory.class.getName(), 4, Level.APPLICATIONERROR, "No Trigger Definition found", "The process change: the flownode registered in the message does not exist in the process definition. Use the Purge Query to clean the database", "No design available", "check the process name");
     private final static BEvent eventListReconciliation = new BEvent(MessagesFactory.class.getName(), 5, Level.ERROR, "Error loading Reconciliation list", "Reconcialiation list can't be loaded", "No detection", "check Exception");
     private final static BEvent eventUpdatePurgeMessage = new BEvent(MessagesFactory.class.getName(), 6, Level.ERROR, "Purge message instance", "Error during purge message", "Purge is not done", "check Exception");
+    private final static BEvent eventErrorLoadingDesign = new BEvent(MessagesFactory.class.getName(), 7, Level.ERROR, "Error during loading the design", "The process design can't be load", "No design will be available", "Check the process");
 
     /* -------------------------------------------------------------------- */
     /*                                                                      */
@@ -88,15 +88,25 @@ public class MessagesFactory {
             " and w.eventtype != 'START_EVENT'";
 
     protected final static String SQLQUERY_RECONCILIATION_BASE = "select distinct w.eventtype as w_eventtype, " +
-            " m.id as m_id, w.id as w_id," +
-            " fi.lastupdatedate as w_lastupdatedate, w.rootprocessinstanceid as w_rootprocessintance," +
+            " w.eventtype as w_eventtype, m.id as m_id, w.id as w_id," +
+            
+            " fi.lastupdatedate as w_lastupdatedate, " +
+            
+            " w.rootprocessinstanceid as w_rootprocessintanceid, w.parentprocessinstanceid as w_parentprocessinstanceid, " +
             " w.messagename as w_messagename, w.flownodename as w_flownodename, " +
             " w.processname as w_processname, w.processdefinitionid as w_processdefinitionid, " +
+            " w.flownodeinstanceid as w_flownodeinstanceid," +
+            
             " w.locked as w_locked, w.active as w_active, w.progress as w_progress,   " +
+            
             " pdroot.name as w_rootprocessname, pdroot.version as w_rootversion, pdroot.processid as w_rootprocessdefinitionid,  " +
+            
             " pdmessage.name as w_messageprocessname, pdmessage.version as w_messageversion, pdmessage.processid as w_messageprocessdefinitionid, " +
+            
             " w.CORRELATION1 as w_correlation1, w.CORRELATION2 as w_correlation2, w.CORRELATION3 as w_correlation3, w.CORRELATION4 as w_correlation4, w.CORRELATION5 as w_correlation5,  " +
+            
             " m.locked as m_locked, m.handled as m_handled " +
+            
             " from waiting_event w " +
             " left join flownode_instance fi on (w.flownodeinstanceid = fi.id) " +
             " left join process_instance piroot on (piroot.id = w.rootprocessinstanceid) " +
@@ -218,7 +228,7 @@ public class MessagesFactory {
             + " and a.CORRELATION3 = b.CORRELATION3 "
             + " and a.CORRELATION4 = b.CORRELATION4 "
             + " and a.CORRELATION5 = b.CORRELATION5 "
-            + " order by a.id, b.id";
+            + " order by a.id, a.targetprocess, a.targetflownode, a.CORRELATION1, a.CORRELATION2, a.CORRELATION3, a.CORRELATION4, a.CORRELATION5, b.id";
 
     /** purge all duplicate for the given id BUT not the given id */
     public final static String SQLQUERY_PURGEDUPLICATEMESSAGEINSTANCE = "DELETE FROM message_instance c WHERE c.id in"
@@ -234,13 +244,13 @@ public class MessagesFactory {
             + " and a.CORRELATION5 = b.CORRELATION5 "
             + ")";
 
-    public class SynthesisOnMessage {
+    public @Data class SynthesisOnMessage {
 
-        long nbWaitingEvent;
-        long nbMessageEvent;
-        long nbReconciliation;
-        List<BEvent> listEvents = new ArrayList<>();
-        protected PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
+        private long nbWaitingEvent;
+        private long nbMessageEvent;
+        private long nbReconciliation;
+        private List<BEvent> listEvents = new ArrayList<>();
+        private PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
 
         public Map<String, Object> getMap() {
             Map<String, Object> result = new HashMap<>();
@@ -300,25 +310,13 @@ public class MessagesFactory {
     /* operations on message */
     /*                                                                      */
     /* -------------------------------------------------------------------- */
-    public class ResultOperation {
+    public @Data class ResultOperation {
 
-        protected List<Message> listMessages = new ArrayList<>();
-        protected List<BEvent> listEvents = new ArrayList<>();
-        protected int numberOfMessages;
+        private List<Message> listMessages = new ArrayList<>();
+        private List<BEvent> listEvents = new ArrayList<>();
+        private int numberOfMessages;
 
-        public List<Message> getListMessages() {
-            return listMessages;
-        }
-
-        public List<BEvent> getListEvents() {
-            return listEvents;
-        }
-
-        public int getNumberOfMessages() {
-            return numberOfMessages;
-        }
-
-        public PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
+        private PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
 
     }
 
@@ -384,22 +382,28 @@ public class MessagesFactory {
                         message.messageInstance.put(entry.getKey().substring(2), entry.getValue());
                 }
                 message.isMessageWithCorrelation = true;
-                message.messageName = (String) record.get("w_messagename");
-                message.rootProcessInstanceId = getLong(record.get("w_rootprocessintance"), null);
+                message.setMessageName((String) record.get("w_messagename"));
+                message.setRootProcessInstanceId(getLong(record.get("w_rootprocessintanceid"), null));
+                message.setProcessInstanceId(getLong(record.get("w_parentprocessinstanceid"), null));
 
-                message.targetProcessName = (String) record.get("w_processname");
-                message.currentProcessVersion = (String) record.get("w_messageversion");
-                message.processDefinitionId = getLong(record.get("w_messageprocessdefinitionid"), null);
+                message.setTargetProcessName((String) record.get("w_processname"));
+                message.setProcessName((String) record.get("w_rootprocessname"));
 
-                message.rootprocessName = (String) record.get("w_rootprocessname");
-                message.rootprocessVersion = (String) record.get("w_rootversion");
-                message.rootProcessDefinitionId = getLong(record.get("w_rootprocessdefinitionid"), null);
+                message.setTargetFlowNodeName((String) record.get("w_flownodename"));
+                message.setFlowNodeName((String) record.get("w_flownodename"));
 
-                message.targetFlowNodeName = (String) record.get("w_flownodename");
-                message.dateWaitingEvent = getLong(record.get("w_lastupdatedate"), null);
+                message.setCurrentProcessVersion((String) record.get("w_messageversion"));
+                message.setProcessDefinitionId(getLong(record.get("w_messageprocessdefinitionid"), null));
 
-                message.messageId = getLong(record.get("m_id"), null);
-                message.waitingId = getLong(record.get("w_id"), null);
+                message.setRootProcessName((String) record.get("w_rootprocessname"));
+                message.setRootProcessVersion((String) record.get("w_rootversion"));
+                message.setRootProcessDefinitionId(getLong(record.get("w_rootprocessdefinitionid"), null));
+
+                message.setFlowNodeInstanceId(getLong(record.get("w_flownodeinstanceid"), null));
+                message.setDateWaitingEvent(getLong(record.get("w_lastupdatedate"), null));
+
+                message.setMessageId(getLong(record.get("m_id"), null));
+                message.setWaitingId(getLong(record.get("w_id"), null));
                 resultOperation.listMessages.add(message);
             }
 
@@ -468,7 +472,21 @@ public class MessagesFactory {
 
             DesignProcessDefinition designProcessAPI = cacheDesign.get(message.processDefinitionId);
             if (designProcessAPI == null) {
-                designProcessAPI = processAPI.getDesignProcessDefinition(message.processDefinitionId);
+                try {
+                    designProcessAPI = processAPI.getDesignProcessDefinition(message.processDefinitionId);
+                } catch (ProcessDefinitionNotFoundException e) {
+                    logger.severe(loggerLabel + loggerExceptionLabel + e.toString());
+                    listEvents.add(new BEvent(eventNoProcessDefinitionFound, "ProcessName[" + message.targetProcessName + "] Version[" + message.currentProcessVersion + "]"));
+                    message.incompleteDetail.append(eventNoProcessDefinitionFound.toString());
+                    return listEvents;
+                }
+                catch(Exception e) {
+                    // error during the design loading
+                    logger.severe(loggerLabel + loggerExceptionLabel + e.toString());
+                    listEvents.add(new BEvent(eventErrorLoadingDesign, "ProcessName[" + message.targetProcessName + "] Version[" + message.currentProcessVersion + "]"));
+                    message.incompleteDetail.append(eventErrorLoadingDesign.toString());
+                    return listEvents;
+                }
                 cacheDesign.put(message.processDefinitionId, designProcessAPI);
             }
 
@@ -517,39 +535,7 @@ public class MessagesFactory {
 
             // check events
 
-            /*
-             * detailExecution.append("IntermediateCatchEvent:");
-             * List<IntermediateCatchEventDefinition> listCatchEvent = flowElementContainer.getIntermediateCatchEvents();
-             * for (IntermediateCatchEventDefinition catchEvent : listCatchEvent) {
-             * detailExecution.append("["+catchEvent.getName()+"]");
-             * if (catchEvent.getName().equals(message.flowNodeName)) {
-             * CatchMessageEventTriggerDefinition catchDefinition = getCatchMessageEventTriggerFromEvent( catchEvent );
-             * if (catchDefinition!=null)
-             * {
-             * listOperations.addAll( catchDefinition.getOperations());
-             * message.setCorrelations( catchDefinition.getCorrelations() );
-             * message.isDesignContentFound = true;
-             * detailExecution.append("*MATCH*");
-             * break;
-             * }
-             * }
-             * }
-             * detailExecution.append("startEvent:");
-             * for( StartEventDefinition startEvent : flowElementContainer.getStartEvents())
-             * {
-             * detailExecution.append("["+startEvent.getName()+"]");
-             * if (startEvent.getName().equals(message.flowNodeName)) {
-             * CatchMessageEventTriggerDefinition catchDefinition = getCatchMessageEventTriggerFromEvent( startEvent );
-             * if (catchDefinition!=null)
-             * {
-             * listOperations.addAll( catchDefinition.getOperations());
-             * message.setCorrelations( catchDefinition.getCorrelations() );
-             * message.isDesignContentFound = true;
-             * break;
-             * }
-             * }
-             * }
-             */
+            
 
             if (!message.isDesignContentFound) {
                 message.incompleteDetail = detailExecution;
@@ -562,18 +548,21 @@ public class MessagesFactory {
             // now analyse operation
             for (Operation operation : message.listOperations) {
                 Expression rightOperand = operation.getRightOperand();
-                if (rightOperand.getExpressionType().equals("TYPE_VARIABLE"))
+                if (rightOperand!=null && "TYPE_VARIABLE".equals(rightOperand.getExpressionType()) && rightOperand.getContent() !=null)
                     message.designContent.add(rightOperand.getContent());
             }
 
             return listEvents;
 
-        } catch (ProcessDefinitionNotFoundException e) {
-            logger.severe(loggerLabel + loggerExceptionLabel + e.toString());
-            listEvents.add(new BEvent(eventNoProcessDefinitionFound, "ProcessName[" + message.targetProcessName + "] Version[" + message.currentProcessVersion + "]"));
-        } catch (Exception e) {
-            logger.severe(loggerLabel + loggerExceptionLabel + e.toString());
+       } catch (Exception e) {
+
+           StringWriter sw = new StringWriter();
+            e.printStackTrace(new PrintWriter(sw));
+            String exceptionDetails = sw.toString();
+
+            logger.severe(loggerLabel + loggerExceptionLabel + e.toString()+" at "+exceptionDetails);
             listEvents.add(new BEvent(eventNoTriggerDefinitionFound, "ProcessName[" + message.targetProcessName + "] Version[" + message.currentProcessVersion + "] FlowNodeName[" + message.targetFlowNodeName + "]"));
+            message.incompleteDetail.append("Error "+e.getMessage()+" at "+exceptionDetails);
         }
 
         return listEvents;
@@ -677,37 +666,36 @@ public class MessagesFactory {
     }
 
     /**
-     * @param message
-     * @param contentMessage
-     * @param processAPI
-     * @return
-     */
-    public List<BEvent> executeMessage(Message message, Map<String, Object> contentMessage, ProcessAPI processAPI) {
-        message.completeMessage = contentMessage;
-        return message.sendMessage(processAPI);
-    }
-
-    /**
      * Purge the message instance attached to the message
      * 
      * @param message
      * @param nbRecordToPurge
      * @return
      */
-    public class ResultPurge {
 
-        public List<BEvent> listEvents = new ArrayList<>();
-        public int nbRowDataDeleted = 0;
-        public int nbRowMessageDeleted = 0;
-        public PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
+    public @Data class ResultPurge {
+
+        private List<BEvent> listEvents = new ArrayList<>();
+        private int nbDatasRowDeleted = 0;
+        private int nbMessagesRowDeleted = 0;
+        private List<Long> listIdMessageInstancePurged = new ArrayList<>();
+        private PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
     }
 
-    public ResultPurge purgeMessageInstance(Message message, boolean purgeAll, int nbRecordToPurge) {
+    /**
+     * purge a list of Message Id
+     * 
+     * @param message
+     * @param purgeAll
+     * @param nbRecordToPurge
+     * @return
+     */
+    public ResultPurge purgeMessageInstance(List<Long> listMessagesId, boolean purgeAll, int nbRecordToPurge) {
         ResultPurge resultPurge = new ResultPurge();
         PerformanceMesure perf = resultPurge.performanceMesure.getMesure("purgemessageinstance");
         perf.start();
 
-        int count=0;
+        int count = 0;
         String query = "";
         Connection connection = null;
         try (Connection con = getConnection();) {
@@ -715,25 +703,25 @@ public class MessagesFactory {
             con.setAutoCommit(false);
             List<Object> parameters = new ArrayList<>();
             // use the 
-            for (Long id : message.listIdMessageInstanceRelative) {
+            for (Long id : listMessagesId) {
                 // stop if we reach the number of purge
-                if (! purgeAll && count >= nbRecordToPurge)
+                if (!purgeAll && count >= nbRecordToPurge)
                     break;
                 count++;
-                
+
                 parameters.clear();
                 parameters.add(id);
-                
-                
+
                 query = SQLUPDATE_PURGE_MESSAGEDATA;
                 ResultQuery resultQuery = executeUpdateQuery("purgemessagedata", SQLUPDATE_PURGE_MESSAGEDATA, parameters, con, false);
-                resultPurge.nbRowDataDeleted += resultQuery.numberOfRows;
+                resultPurge.nbDatasRowDeleted += resultQuery.numberOfRows;
                 resultPurge.listEvents.addAll(resultQuery.listEvents);
 
                 query = SQLUPDATE_PURGE_MESSAGE;
                 resultQuery = executeUpdateQuery("purgemessage", SQLUPDATE_PURGE_MESSAGE, parameters, con, false);
-                resultPurge.nbRowMessageDeleted += resultQuery.numberOfRows;
+                resultPurge.nbMessagesRowDeleted += resultQuery.numberOfRows;
                 resultPurge.listEvents.addAll(resultQuery.listEvents);
+                resultPurge.listIdMessageInstancePurged.add(id);
             }
             con.commit();
         } catch (Exception e) {
@@ -761,32 +749,16 @@ public class MessagesFactory {
     /**
      * ResultQuery
      */
-    public class ResultQuery {
+    public @Data class ResultQuery {
 
-        public int getNumberOfRows() {
-            return numberOfRows;
-        }
+        private List<Map<String, Object>> listResult = new ArrayList<>();
+        private Object oneResult;
+        private List<BEvent> listEvents = new ArrayList<>();
 
-        protected List<Map<String, Object>> listResult = new ArrayList<>();
-        protected Object oneResult;
-        protected List<BEvent> listEvents = new ArrayList<>();
+        private int numberOfRows = 0;
+        private int numberOfDiffAttributes = 0;
 
-        protected int numberOfRows = 0;
-        protected int numberOfDiffAttributes = 0;
-
-        public List<Map<String, Object>> getListResult() {
-            return listResult;
-        }
-
-        public Object getOneResult() {
-            return oneResult;
-        }
-
-        public List<BEvent> getListEvents() {
-            return listEvents;
-        }
-
-        public PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
+        private PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
 
     }
 
@@ -800,7 +772,7 @@ public class MessagesFactory {
     public ResultQuery executeOneResultQuery(String name, String query, List<Object> parameters, Object defaultValue, Connection con) {
         ResultQuery resultQuery = new ResultQuery();
 
-        PerformanceMesure perf = resultQuery.performanceMesure.getMesure("sqlrequest_" + name);
+        PerformanceMesure perf = resultQuery.performanceMesure.getMesure("sqlrequestOneQuery_" + name);
         perf.start();
         ResultSet rs = null;
         try (PreparedStatement pstmt = con.prepareStatement(query);) {
@@ -836,7 +808,7 @@ public class MessagesFactory {
      */
     public ResultQuery executeUpdateQuery(String name, String query, List<Object> parameters, Connection con, boolean commit) {
         ResultQuery resultQuery = new ResultQuery();
-        PerformanceMesure perf = resultQuery.performanceMesure.getMesure("sqlrequest_" + name);
+        PerformanceMesure perf = resultQuery.performanceMesure.getMesure("sqlupdate_" + name);
         perf.start();
 
         try (PreparedStatement pstmt = con.prepareStatement(query);) {
@@ -876,7 +848,7 @@ public class MessagesFactory {
      */
     public ResultQuery executeListResultQuery(String name, String query, List<Object> parameters, int numberOfRecords, String diffAttribute, Connection con) {
         ResultQuery resultQuery = new ResultQuery();
-        PerformanceMesure perf = resultQuery.performanceMesure.getMesure("sqlrequest_" + name);
+        PerformanceMesure perf = resultQuery.performanceMesure.getMesure("sqlrequestlist_" + name);
         perf.start();
 
         Set<String> setOfDiffAttribut = new HashSet<>();
@@ -929,7 +901,7 @@ public class MessagesFactory {
      * @throws SQLException
      */
     public static Connection getConnection() throws SQLException {
-        // logger.info(loggerLabel+".getDataSourceConnection() start");
+        // ".getDataSourceConnection() start"
 
         StringBuilder msg = new StringBuilder();
         List<String> listDatasourceToCheck = new ArrayList<>();
@@ -937,11 +909,11 @@ public class MessagesFactory {
             listDatasourceToCheck.add(dataSourceString);
 
         for (String dataSourceString : listDatasourceToCheck) {
-            // logger.info(loggerLabel + ".getDataSourceConnection() check[" + dataSourceString + "]");
+            // .getDataSourceConnection() check[" + dataSourceString + "]"
             try {
                 final Context ctx = new InitialContext();
                 final DataSource dataSource = (DataSource) ctx.lookup(dataSourceString);
-                // logger.info(loggerLabel + ".getDataSourceConnection() [" + dataSourceString + "] isOk");
+                // .getDataSourceConnection() [" + dataSourceString + "] isOk"
                 return dataSource.getConnection();
 
             } catch (NamingException e) {
@@ -981,29 +953,54 @@ public class MessagesFactory {
      * 
      * @param listMessages
      */
+    private class SignatureMessage {
+
+        Set<String> listSnippets = new HashSet<>();
+        Set<Long> listWaitingEvent = new HashSet<>();
+        Set<Long> listMessageInstance = new HashSet<>();
+    }
+
     private List<Message> reduceCrossJointMessages(List<Message> listMessages) {
         // first,order the list by the day
         sortMyMessageList(listMessages, new String[] { "waitingevent.lastupdatedate", "waitingevent.id", "messageinstance.id" });
 
-        Map<String, Set<String>> setListMessageSignature = new HashMap<>();
+        Map<String, SignatureMessage> setListMessageSignature = new HashMap<>();
         List<Message> listReduced = new ArrayList<>();
         for (Message message : listMessages) {
 
-            Set<String> listCollectedMessage = setListMessageSignature.get(message.getSignatureMessage());
+            SignatureMessage listCollectedMessage = setListMessageSignature.get(message.getSignatureMessage());
             if (listCollectedMessage == null) {
                 // ok, new one
-                listCollectedMessage = new HashSet<>();
+                listCollectedMessage = new SignatureMessage();
             }
-            // is this same waiting_id OR message_Id is referenced, do not keep it
-            if (listCollectedMessage.contains("W" + message.waitingId)
-                    || listCollectedMessage.contains("M" + message.messageId))
+
+            // Calculate, for the signature, the number of WAITING_EVENT and number of MESSAGE_EVENT.
+            // message return all combinaison : for 3 waiting event / 4 message, there are 3*4 messages
+            listCollectedMessage.listWaitingEvent.add(message.waitingId);
+            listCollectedMessage.listMessageInstance.add(message.messageId);
+
+            // is this same waiting_id OR message_Id is referenced, do not keep it. We want to keep only unique new item
+            if (listCollectedMessage.listSnippets.contains("W" + message.waitingId)
+                    || listCollectedMessage.listSnippets.contains("M" + message.messageId))
                 continue;
             // ok, we keep that one
             listReduced.add(message);
-            listCollectedMessage.add("W" + message.waitingId);
-            listCollectedMessage.add("M" + message.messageId);
+            listCollectedMessage.listSnippets.add("W" + message.waitingId);
+            listCollectedMessage.listSnippets.add("M" + message.messageId);
+
             setListMessageSignature.put(message.getSignatureMessage(), listCollectedMessage);
         }
+
+        // now, review the message and complete the number of "browser" for each
+        for (Message message : listReduced) {
+            SignatureMessage listCollectedMessage = setListMessageSignature.get(message.getSignatureMessage());
+            if (listCollectedMessage != null) {
+                message.setSameSignatureNbMessageInstance(listCollectedMessage.listMessageInstance.size());
+                message.setSameSignatureNbWaitingEvent(listCollectedMessage.listWaitingEvent.size());
+            }
+
+        }
+
         return listReduced;
     }
 
@@ -1030,6 +1027,7 @@ public class MessagesFactory {
             return defaultValue;
         }
     }
+
     public static Boolean getBoolean(Object o, Boolean defaultValue) {
         try {
             if (o == null)
@@ -1038,7 +1036,7 @@ public class MessagesFactory {
                 return ((Long) o).equals(1);
             if (o instanceof Integer)
                 return ((Integer) o).equals(1);
-            
+
             return "true".equalsIgnoreCase(o.toString());
         } catch (Exception e) {
             return defaultValue;

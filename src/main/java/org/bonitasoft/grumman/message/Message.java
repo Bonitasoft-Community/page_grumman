@@ -21,14 +21,13 @@ import org.bonitasoft.engine.operation.Operation;
 import org.bonitasoft.log.event.BEvent;
 import org.bonitasoft.log.event.BEvent.Level;
 
+import lombok.Data;
+import lombok.Getter;
 
 
-public class Message {
 
-    private final static Logger logger = Logger.getLogger(Message.class.getName());
+public  @Data class Message {
 
-    private static String loggerLabel = "MessagesFactory ##";
-    private final static BEvent eventSendMessageError = new BEvent(Message.class.getName(), 1, Level.ERROR, "Send error", "Error when a message is send", "Message is not sended", "Check error");
 
     /**
      *  a message containts:
@@ -51,19 +50,21 @@ public class Message {
      * @author Firstname Lastname
      *
      */
-    public enum enumStatus { INCOMPLETECONTENT, FAILEDDESIGN, COMPLETE, DUPLICATE, SENDED, SENDFAILED };
-    public enumStatus status;
+    public enum enumStatus { INCOMPLETECONTENT, FAILEDDESIGN, COMPLETE, DUPLICATE, SENDED, SENDEDANDPURGE, SENDFAILED, EXECUTED, EXECUTEDFAILED };
+    private enumStatus status;
     /**
      * theses informations describe the message
      */
-    public String messageName;
+    private String messageName;
     
+    /** correlation : should be same as processName */
     public String targetProcessName;
+    /** correlation : should be same as flowNodeName */
     public String targetFlowNodeName;
     
     
     /**
-     * waiting event part 
+     * ---------------------------------------------- waiting event part 
      */
     
     
@@ -76,13 +77,23 @@ public class Message {
      */
     public Long processDefinitionId;
     
-    public String rootprocessName;
-    public String rootprocessVersion;
+    /** correlation : should be same as targetProcessName */
+    public String processName;
+       
+    public String rootProcessName;
+    
+    public String rootProcessVersion;
     public Long rootProcessDefinitionId;
 
     public Map<String, Object> waitingEvent = new HashMap<>();
     public Long waitingId;
     public Long rootProcessInstanceId;
+    private Long processInstanceId;
+    
+    /** correlation : should be same as targetFlowNodeName */
+    private String flowNodeName;
+    private Long flowNodeInstanceId;
+    
     public boolean isDesignContentFound=false;
     public enum enumCatchEventType { STARTMESSAGE, TASKMESSAGE, BOUNDARYEVENT, CATCHMESSAGEEVENT, SUBPROCESSEVENT };
     public enumCatchEventType catchEventType;
@@ -90,6 +101,9 @@ public class Message {
     public Long dateWaitingEvent;
     public long nbWaitingEvent;
 
+    private int sameSignatureNbWaitingEvent=0;
+    private int sameSignatureNbMessageInstance=0;
+    
     
     /**
      * message instance part
@@ -102,6 +116,7 @@ public class Message {
      * before send the message, take a picture of all messageinstances to be deleted
      */
     public List<Long> listIdMessageInstanceRelative = new ArrayList<Long>();
+    public List<Long> listIdMessageInstanceRelativePurged = new ArrayList<Long>();
     public Map<String, Object> messageInstanceVariables = new HashMap<>();
 
     /**
@@ -121,6 +136,8 @@ public class Message {
     public boolean isComplete = true;
 
     public StringBuilder incompleteDetail= new StringBuilder();
+    
+    public StringBuilder executionDetail= new StringBuilder();
     
     /**
      * information about the management of the message.
@@ -174,31 +191,37 @@ public class Message {
             return null;
         return listCorrelationDefinitions.get( i ).getKey().getName();
       }
+    
+    public final static boolean CST_DEFAULTJSON_KEEPNONE_CORRELATIONSIGNATURE = false;
     /**
      * return a signature for the correlation values
      * @return
      */
-    public String getCorrelationSignature() {
+    public String getCorrelationSignature( boolean keepNone) {
         Object[] correlationValue = new Object[ listColumnCorrelation.length];
         for (int i=0;i<listColumnCorrelation.length;i++)
         {
-            correlationValue[ i ] = getValueCorrelation( i,false);
+            correlationValue[ i ] = getValueCorrelation( i,keepNone);
         }
-        return getCorrelationSignature( correlationValue );
+        return getCorrelationSignature( correlationValue, keepNone );
     }
     /**
      * static to share it with different source
      * @param correlationValue
      * @return
      */
-    public static String getCorrelationSignature( Object[] correlationValue ) {
+    public static String getCorrelationSignature( Object[] correlationValue, boolean keepNone ) {
         StringBuilder signature = new StringBuilder();
         for (int i=0;i<correlationValue.length;i++)
         {
             if (i>0) {
                 signature.append( "," );
             }
-            Object valueCorrelation = correlationValue[ i ];            
+            Object valueCorrelation = correlationValue[ i ];
+            
+            if (!keepNone)
+                valueCorrelation= (valueCorrelation==null || "NONE".equals(valueCorrelation)) ? null : valueCorrelation;
+            
             signature.append( valueCorrelation==null? "[]":"["+valueCorrelation.toString()+"]");
         }
         return signature.toString();
@@ -211,106 +234,20 @@ public class Message {
         this.listOperations.addAll( listOperations);
         
     }
-      
-    /* -------------------------------------------------------------------- */
-    /*                                                                      */
-    /* Send message */
-    /*                                                                      */
-    /* -------------------------------------------------------------------- */
- 
-    public List<BEvent> sendMessage(ProcessAPI processAPI) {
-        List<BEvent> listEvents = new ArrayList<>();
-        try {
-
-            Expression targetProcess = new ExpressionBuilder().createConstantStringExpression(targetProcessName);
-            Expression targetFlowNode = new ExpressionBuilder().createConstantStringExpression(targetFlowNodeName);
-            List<ExpressionDescription> listExpressions = new ArrayList<>();
-            if (completeMessage!=null) {
-                for (Entry<String, Object> entry : completeMessage.entrySet()) {
-                    listExpressions.add( new ExpressionDescription(entry.getKey(), entry.getValue()==null ? null : entry.getValue().toString() ));
-                }
-            }
-            Map<Expression, Expression> messageContent = createMapExpression(listExpressions);
-
-            if (isMessageWithCorrelation && listCorrelationDefinitions!=null) {
-                listExpressions = new ArrayList<>();
-
-
-                StringBuilder traceCorrelation = new StringBuilder();
-                
-                
-                // we have to attached the correct key.
-                Map<String,Object> mapCorrelationValues = new HashMap<>();
-                for (int i=0;i<listColumnCorrelation.length;i++) {
-                    Object value= getValueCorrelation( i,false);
-                    if (value!=null) {
-                        //  format is keyId-$-1003
-                        int pos = value.toString().indexOf("-$-");
-                        if (pos!=-1) {
-                            mapCorrelationValues.put(value.toString().substring(0,pos), value.toString().substring(pos+3));
-                        }
-                    }
-                }
-                    
-                for (int i=0;i<listCorrelationDefinitions.size();i++)
-                {
-                    CorrelationDefinition correlation = listCorrelationDefinitions.get(i);
-                    Object value = mapCorrelationValues.get(correlation.getKey().getName());
-                    listExpressions.add( new ExpressionDescription(correlation.getKey().getName(), value==null ? null: value.toString()));
-                    traceCorrelation.append("["+correlation.getKey().getName()+"]=["+(value==null ? null: value.toString())+"], ");
-                }
-                    
-                Map<Expression, Expression> messageCorrelations = createMapExpression(listExpressions);
-                logger.info( loggerLabel+" Send message["+messageName+"] targetProcess["+targetProcessName+"] FlowName["+targetFlowNodeName+"] RootCaseId["+rootProcessInstanceId+"]"+traceCorrelation);
-                processAPI.sendMessage(messageName, targetProcess, targetFlowNode, messageContent, messageCorrelations);
-                
-                
-            } else {
-                processAPI.sendMessage( messageName, targetProcess, targetFlowNode, messageContent);
-            }
-            status=enumStatus.SENDED;            
-        } catch (SendEventException se) {
-            status=enumStatus.SENDFAILED;            
-
-            listEvents.add(new BEvent(eventSendMessageError, se, messageName+" e:"+se.toString()));
-        } catch (Exception e) {
-            listEvents.add(new BEvent(eventSendMessageError, e, messageName+" e:"+e.toString()));
-            status=enumStatus.SENDFAILED;            
-        }
-       
-        return listEvents;
+  
+    /**
+     * normalise the status to send back to Json
+     * @return
+     */
+    public String getStatusForJson() {
+        return status.toString().toLowerCase();        
     }
-
     
-    private class ExpressionDescription {
-        protected String name;
-        protected String value;
-        ExpressionDescription(String name, String value ) {
-            this.name = name;
-            this.value = value;
-        }
-    }
-    private Map<Expression, Expression> createMapExpression(List<ExpressionDescription> listValues) throws InvalidExpressionException, IllegalArgumentException {
-        Map<Expression, Expression> mapExpression = new HashMap<Expression, Expression>();
-        for (ExpressionDescription oneExpression : listValues) {
-
-            //Expression exprName= new ExpressionBuilder().createNewInstance("name"+name).setContent( name).setExpressionType( ExpressionType.TYPE_CONSTANT).setReturnType( String.class.getName()).done();
-            //Expression exprValue= new ExpressionBuilder().createNewInstance("value").setContent( value ).setExpressionType( ExpressionType.TYPE_CONSTANT).setReturnType(String.class.getName()).done();
-
-            Expression exprName = new ExpressionBuilder().createConstantStringExpression(oneExpression.name);
-            Expression exprValue = null;
-            if (oneExpression.value == null || oneExpression.value.length() == 0)
-                exprValue = new ExpressionBuilder().createNewInstance("value-" + oneExpression.name).setContent("").setExpressionType(ExpressionType.TYPE_CONSTANT).setReturnType(String.class.getName()).done();
-            else
-                exprValue = new ExpressionBuilder().createConstantStringExpression(oneExpression.value);
-            mapExpression.put(exprName, exprValue);
-        }
-        return mapExpression;
-    }
+   
 
     /* -------------------------------------------------------------------- */
     /*                                                                      */
-    /* Send message */
+    /* Signature */
     /*                                                                      */
     /* -------------------------------------------------------------------- */
     /**
@@ -339,11 +276,11 @@ public class Message {
         return signature.toString();
     }
  
-        /* -------------------------------------------------------------------- */
-        /*                                                                      */
-        /* MessageKeyGroup */
-        /*                                                                      */
-        /* -------------------------------------------------------------------- */
+    /* -------------------------------------------------------------------- */
+    /*                                                                      */
+    /* MessageKeyGroup */
+    /*                                                                      */
+    /* -------------------------------------------------------------------- */
      
     /**
      * MessageKeyGroup structure
@@ -383,7 +320,12 @@ public class Message {
         return MessageKeyGroup.getInstanceFromMessage( this ).getKey();
     }
     
-    
+    /* -------------------------------------------------------------------- */
+    /*                                                                      */
+    /* Serialise the message - note, each functin serialize the message itself */
+    /*                                                                      */
+    /* -------------------------------------------------------------------- */
+ 
     public Map<String,Object> getMap() {
         Map<String,Object> result = new HashMap<>();
         result.put("event",  waitingEvent);

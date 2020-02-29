@@ -5,13 +5,15 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import org.bonitasoft.engine.api.ProcessAPI;
+import org.bonitasoft.grumman.duplicate.DuplicateMessageInstance;
 import org.bonitasoft.grumman.message.MessagesFactory;
-import org.bonitasoft.grumman.purge.DuplicateMessageInstance;
 import org.bonitasoft.grumman.purge.PurgeTablesMessage;
 import org.bonitasoft.grumman.reconciliation.ReconcilationMessage;
 import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.ReconcialiationFilter;
 import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.ReconcialiationFilter.TYPEFILTER;
 import org.json.simple.JSONValue;
+
+import lombok.Data;
 
 public class GrummanAPI {
 
@@ -19,7 +21,42 @@ public class GrummanAPI {
 
     private static String loggerLabel = "GrummanAPI ##";
 
+    /**
+     * All JSON constant exchanded with the page
+     */
+    public static final String CSTJSON_LISTEVENTS= "listevents";
+    public static final String CSTJSON_NBRECONCILIATIONS= "nbReconciliations";
+    public static final String CSTJSON_WID = "wid";
+    public static final String CSTJSON_MID = "mid";
+    public static final String CSTJSON_CASEID =     "caseid";
+    public static final String CSTJSON_STATUS = "status";
+    public static final String CSTJSON_NBEXECUTIONINPROGRESS = "nbexecutioninprogress";
+    public static final String CSTJSON_LISTMESSAGEINSTANCERELATIVE     = "listmessageinstancerelative";
+    public static final String CSTJSON_LISTMESSAGEINSTANCERELATIVEPURGED= "listmessageinstancerelativepurged";
+    public static final String CSTJSON_LISTMESSAGEINSTANCEPURGED= "listmessageinstancepurged";
+    public static final String CSTJSON_STATUSEXEC = "statusexec";
 
+    public static final String CSTJSON_MESSAGENAME = "messagename";
+    public static final String CSTJSON_CATCHEVENTTYPE ="catcheventtype";
+    public static final String CSTJSON_EXPL = "expl";
+    public static final String CSTJSON_EXPLEXEC = "explexec";
+    public static final String CSTJSON_CORRELATIONVALUES = "correlationvalues";
+    public static final String CSTJSON_SIGNATURENBMESSAGEINSTANCE = "signaturenbmessageinstance";
+    public static final String CSTJSON_SIGNATURENBWAITINGEVENT ="signaturenbwaitingevent";
+
+    
+    public static final String CSTJSON_PERFORMANCEMESURE = "performancemesure";
+    public static final String CSTJSON_PERFORMANCEMESURETOTAL = "total";
+
+    public static final String CSTJSON_NB_DATASROW_DELETED = "nbdatasrowdeleted";
+    public static final String CSTJSON_ND_MESSAGESROW_DELETED ="nbmessagesrowdeleted";
+    
+    
+    public static final String CSTJSON_LISTDUPLICATION = "listduplications";
+    public static final String CSTJSON_NBMESSAGEDUPLICATED ="nbMessagesDuplicated";            
+    public static final String CSTJSON_ORIGINALID = "originalid";
+    
+    
     ProcessAPI processAPI;
     MessagesFactory messageFactory;
 
@@ -46,7 +83,7 @@ public class GrummanAPI {
 
     }
 
-    public static class MessagesList {
+    public static @Data class MessagesList {
         
         private List<String> listKeys = null;
         private List<String> listKeysGroups = null;
@@ -57,6 +94,9 @@ public class GrummanAPI {
          */
         
         private boolean purgeAllRelativesId = false;
+        private boolean sendincomplete = false;
+        private boolean executecomplete = false;
+        
         
         @SuppressWarnings({ "unchecked", "rawtypes" })        
         public static MessagesList getInstanceFromJson(String jsonSt ) {
@@ -81,7 +121,10 @@ public class GrummanAPI {
             messagesList.listKeys = mapObject.containsKey("keys")? (List) mapObject.get("keys"):null;
             messagesList.listKeysGroups = mapObject.containsKey("keysgroup")? (List) mapObject.get("keysgroup"):null;
             messagesList.numberofmessages   =  MessagesFactory.getLong( mapObject.get("numberofmessages"),-1L).intValue();
-            messagesList.purgeAllRelativesId=  MessagesFactory.getBoolean( mapObject.get("purgeallrelatives"), false);
+            messagesList.purgeAllRelativesId =  MessagesFactory.getBoolean( mapObject.get("purgeallrelatives"), false);
+            messagesList.sendincomplete =  MessagesFactory.getBoolean( mapObject.get("sendincomplete"), false);
+            messagesList.executecomplete =  MessagesFactory.getBoolean( mapObject.get("executecomplete"), false);
+
             return messagesList;
         }
         public int getNumberOfMessages() {

@@ -104,7 +104,7 @@ public class PurgeTablesMessage {
             for (Query query : listQueries) {
                 ResultOnePurge resultOnePurge = new ResultOnePurge();
                 ResultQuery resultQuery = messagesFactory.executeOneResultQuery("monitorquery", query.sqlQueryCount, null, 0, con);
-                resultPurge.performanceMesure.add(resultQuery.performanceMesure);
+                resultPurge.performanceMesure.add(resultQuery.getPerformanceMesure() );
                 resultOnePurge.nbRecords = messagesFactory.getLong(resultQuery.getOneResult(), 0L);
                 resultOnePurge.query = query;
                 resultPurge.listResultPurges.add(resultOnePurge);
@@ -134,14 +134,14 @@ public class PurgeTablesMessage {
             for (Query query : listQueries) {
                 ResultOnePurge resultOnePurge = new ResultOnePurge();
                 ResultQuery resultQuery = messagesFactory.executeUpdateQuery("purgeItem", query.sqlQueryPurge, null, con, true);
-                resultPurge.performanceMesure.add(resultQuery.performanceMesure);
+                resultPurge.performanceMesure.add(resultQuery.getPerformanceMesure() );
                 resultPurge.listEvents.addAll( resultQuery.getListEvents());
                 resultOnePurge.nbRecordsUpdated = resultQuery.getNumberOfRows();
                 resultPurge.listEvents.addAll( resultQuery.getListEvents());
                 
                 // reexecute the query to have a status
                 resultQuery = messagesFactory.executeOneResultQuery("countItem", query.sqlQueryCount, null, 0, con);
-                resultPurge.performanceMesure.add(resultQuery.performanceMesure);
+                resultPurge.performanceMesure.add(resultQuery.getPerformanceMesure() );
                 resultOnePurge.nbRecords = messagesFactory.getLong(resultQuery.getOneResult(), 0L);
 
                 resultPurge.listEvents.addAll( resultQuery.getListEvents());

@@ -57,7 +57,7 @@
 		<table><tr><td><h1>Grumman</h1></td><td rowspan="2"><img src="img/grumman.jpg" width="150" heigth="150" /></td></tr>
 			<tr><td>
 				<center>
-					Beta 0.10
+					Beta 0.11
 				</center>
 			</td></tr>
 		</table>
@@ -101,9 +101,9 @@
 			</tr></table>
 				
 			<table class="table table-striped">
-				<tr><td>Number of events waiting</td>			<td style="text-align:right">{{ctrl.synthesis.nbwaitingevent}}</td></tr>
-				<tr><td>Number of messages waiting</td>			<td style="text-align:right">{{ctrl.synthesis.nbmessageevent}}</td></tr>
-				<tr><td>Number of messages reconciliation</td>	<td style="text-align:right">{{ctrl.synthesis.nbreconciliation}}</td></tr>
+				<tr><td>Number of waiting events</td>			<td style="text-align:right">{{ctrl.synthesis.nbwaitingevent}}</td></tr>
+				<tr><td>Number of waiting messages</td>			<td style="text-align:right">{{ctrl.synthesis.nbmessageevent}}</td></tr>
+				<tr><td>Number of reconciliation messages</td>	<td style="text-align:right">{{ctrl.synthesis.nbreconciliation}}</td></tr>
 			</table>
 			<div>Result in {{ctrl.synthesis.performancemesure.total.time}} ms</div>
 		
@@ -133,6 +133,30 @@
 						<li>Incomplete Content: In the design, message expect content (variable A, B, C). Sender didn't send all required variables.Page can resend a complete content, setting to null all missing content.</li>
 						<li>Failed design: something is wrong in the process definition, and the event can't be retrieved. Check the details</li>
 						<li>Complete: message was complete, but the execution failed (an operation not correct). Page can resend the message.</li>
+						SQL Request used:<br>
+						<div style="font-style: italic;">
+select distinct  m.locked, w.locked, m.handled, w.active, w.progress, <br>   
+w.eventtype as w_eventtype, m.id as m_id, w.id as w_id, fi.lastupdatedate as w_lastupdatedate, <br> 
+w.rootprocessinstanceid as w_rootprocessintance, w.messagename as w_messagename, w.flownodename as w_flownodename, w.processname as w_processname, <br> 
+ w.processdefinitionid as w_processdefinitionid, w.locked as w_locked, w.active as w_active, w.progress as w_progress, pdroot.name as w_rootprocessname, <br> 
+ pdroot.version as w_rootversion, pdroot.processid as w_rootprocessdefinitionid, pdmessage.name as w_messageprocessname, pdmessage.version as w_messageversion, <br> 
+ pdmessage.processid as w_messageprocessdefinitionid,  <br>
+ w.CORRELATION1 as w_correlation1, w.CORRELATION2 as w_correlation2, w.CORRELATION3 as w_correlation3, w.CORRELATION4 as w_correlation4, w.CORRELATION5 as w_correlation5, m.locked as m_locked, <br> 
+m.handled as m_handled  <br>
+from waiting_event w <br> 
+left join flownode_instance fi on (w.flownodeinstanceid = fi.id) <br>
+left join process_instance piroot on (piroot.id = w.rootprocessinstanceid) <br> 
+left join process_definition pdroot on (piroot.processdefinitionid = pdroot.processid) <br> 
+left join process_instance pimessage on (pimessage.id = w.parentprocessinstanceid) <br> 
+left join process_definition pdmessage on (w.processdefinitionid = pdmessage.processid), <br> 
+message_instance m  <br>
+where m.locked = 0 <br> 
+  AND w.locked = 0 and w.active = 1 -- AND w.progress = 0 <br>
+  and w.processname = m.targetprocess and w.flownodename = m.targetflownode <br> 
+  and w.eventtype != 'START_EVENT' <br>
+  and w.CORRELATION1 = m.CORRELATION1 and w.CORRELATION2 = m.CORRELATION2 and w.CORRELATION3 = m.CORRELATION3 and w.CORRELATION4 = m.CORRELATION4 and w.CORRELATION5 = m.CORRELATION5 <br> 
+order by m.id, w.id, w_lastupdatedate; <br>
+						</div>
 					</div>
 				</td>
 				<td style="vertical-align: top">
@@ -140,10 +164,10 @@
 						<div class="panel-heading">Informations</div>
 						<div>
 						<table class="table table-striped">
-							<tr><td>Reconciliation messages</td><td>{{ctrl.reconciliationmsg.detection.nbReconciliations}}</td></tr>
-							<tr><td>Complete messages</td><td>{{ctrl.reconciliationmsg.detection.nbCompleteMessages}}</td></tr>
-							<tr><td>Incomplete messages</td><td>{{ctrl.reconciliationmsg.detection.nbIncompleteMessages}}</td></tr>
-							<tr><td>Number of processes/version/flownodes</td><td>{{ctrl.reconciliationmsg.detection.nbGroups}}</td></tr>
+							<tr><td>Reconciliation messages</td>				<td style="text-align:right">{{ctrl.reconciliationmsg.detection.nbReconciliations}}</td></tr>
+							<tr><td>Complete messages</td>						<td style="text-align:right">{{ctrl.reconciliationmsg.detection.nbCompleteMessages}}</td></tr>
+							<tr><td>Incomplete messages</td>					<td style="text-align:right">{{ctrl.reconciliationmsg.detection.nbIncompleteMessages}}</td></tr>
+							<tr><td>Number of processes/version/flownodes</td>	<td style="text-align:right">{{ctrl.reconciliationmsg.detection.nbGroups}}</td></tr>
 							
 						</table>
 						</div>
@@ -155,32 +179,36 @@
 			<div ng-bind-html="ctrl.getListEvents( ctrl.reconciliationmsg.listevents )"></div><p>
 			<div>Result in {{ctrl.reconciliationmsg.detection.performancemesure.total.time}} ms</div>
 			
-			<h1>Messages</h1>
+			<h1>Reconciliation Messages</h1>
 			
+			<!--  HEADER -->
+			<table width="100%"><tr>
+				<td style="padding: 0px 30px 10px 10px;vertical-align: top">
+					<button ng-click="ctrl.selectMessage( 'all', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select all</button>&nbsp;
+			    	<button ng-click="ctrl.selectMessage( 'incomplete', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select incomplete messages</button>&nbsp;
+					<button ng-click="ctrl.selectMessage( 'complete', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select complete messages</button>&nbsp;
+					<button ng-click="ctrl.selectMessage( 'none', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Unselect all</button>&nbsp;
+					<a ng-click="ctrl.exportReconciliationData()" title="Click to export to Excel file"><img src="img/docexcel.gif" /></a></td>
 			
-			<button ng-click="ctrl.selectReconciliationMessage( 'all' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select all</button>&nbsp;
-			<!-- <button ng-click="ctrl.selectReconciliationMessage( 'incomplete' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select incomplete content</button>&nbsp; -->
-			<button ng-click="ctrl.selectReconciliationMessage( 'none' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Unselect all</button>&nbsp;
+				<td style="padding: 0px 30px 10px 10px;vertical-align: top;text-align:right">
+					<button ng-click="ctrl.showDetailMessage( 'show', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Show All details</button>&nbsp;
+					<button ng-click="ctrl.showDetailReconciliationMessage( 'hide' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Hide All details</button></td>
+			</tr></table>
 			
-			<button ng-click="ctrl.showDetailReconciliationMessage( 'show' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Show All details</button>&nbsp;
-			<button ng-click="ctrl.showDetailReconciliationMessage( 'hide' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Hide All details</button>&nbsp;
-			<a ng-click="ctrl.exportReconciliationData()" title="Click to export to Excel file"><img src="img/docexcel.gif" /></a>
-			
+			<!--  DATA -->
 			<table class="table table-striped">
-				<tr><th></th><th>Status</th><th>Process Name</th><th>Version</th><th>Flow node Name</th><th>Type</th><th>Number of reconciliations message in error</th></tr>
+				<tr><th></th><th>Status</th><th>Process Name</th><th>Version</th><th>Flow node Name</th><th>Type</th><th>Nb reconciliation messages in error</th></tr>
 				<tbody ng-repeat="message in ctrl.reconciliationmsg.detection.listmessages">
 				<tr>
 					<td style="{{ctrl.getReconciliationBackground( message )}}">
-						<div ng-if="message.status !== 'complete'">
-							<input ng-model="message.selected" type="checkbox">
-						</div>
+						<input ng-model="message.selected" type="checkbox">
 					</td>
 					<td style="{{ctrl.getReconciliationBackground( message )}}">{{message.status}} {{message.statusexec}}</td>					
 					<td style="{{ctrl.getReconciliationBackground( message )}}">{{message.processname}}</td>
 					<td style="{{ctrl.getReconciliationBackground( message )}}">{{message.processversion}}</td>
 					<td style="{{ctrl.getReconciliationBackground( message )}}">{{message.flowname}}</td>
 					<td style="{{ctrl.getReconciliationBackground( message )}}">{{message.catcheventtype}}</td>
-					<td style="{{ctrl.getReconciliationBackground( message )}}">{{message.numberofmessages}}</td>
+					<td style="{{ctrl.getReconciliationBackground( message )}};text-align:right">{{message.numberofmessages}}</td>
 					<td style="{{ctrl.getReconciliationBackground( message )}}"><select ng-model="message.showdetail">
 						<option value="show">Show detail</option>
 						<option value="hide">Hide detail</option>
@@ -190,18 +218,29 @@
 				</tr>
 				<tr ng-if="message.showdetail=='show'"><td></td><td colspan="7">
 					<table class="table table-bordered" width="100%">			
-						<tr><th>CaseId</th><th>Message name</th><th>Waiting ID</th><th>Message ID</th><th>Correlations</th><th>Expl.</th><th>Status</th></tr>
+						<tr><th>CaseId</th><th>Message name</th><th>Waiting ID</th><th>Message ID</th>
+							<th>Nb Waiting events</th>
+							<th>Nb Messages</th>
+							<th>Correlations</th><th>Expl.</th><th>Status</th>
+						</tr>
 						<tr ng-repeat="detail in message.details">
-							<td >{{detail.caseid}}</td>
+							<td style="text-align:right">{{detail.caseid}}</td>
 		                    <td >{{detail.messagename}}</td>
-		                    <td >{{detail.wid}}</td> 
-		                    <td >{{detail.mid}}</td>
+		                    <td style="text-align:right">{{detail.wid}}</td> 
+		                    <td style="text-align:right">{{detail.mid}}</td>
+		                    <td style="text-align:right">{{detail.signaturenbwaitingevent}}</td>
+		                    <td style="text-align:right">{{detail.signaturenbmessageinstance}}</td>
 		                    <td >{{detail.correlationvalues}}</td>		                    
-		                    <td >{{detail.expl}}</td>
+		                    <td >{{detail.expl}}
+		                    	<div ng-if="detail.explexec.length>0" style="font-style: italic;font-weight: bold;">
+		                    		<br>Execution:
+		                    			{{detail.explexec}}
+		                    	</div>
+		                    </td>
 		                    <td >
 		                    
-		                    	<div ng-if="detail.statusexec != ''"><span class="{{ctrl.getReconciliationDetailBackground( detail )}}">
-		                    	  {{detail.nbexecutioninprogress}}&nbsp;{{detail.statusexec}}
+		                    	<div ng-if="detail.statusexec != ''"><span class="{{ctrl.getDetailBackground( detail )}}">
+		                    	  {{detail.statusexec}}&nbsp;{{detail.nbexecutioninprogress}}&nbsp;msg
 							</span></div>
 							
 							
@@ -213,18 +252,28 @@
 				</tbody>
 			</table>
 			
-			<button ng-click="ctrl.selectReconciliationMessage( 'all' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select all</button>&nbsp;
-			<button ng-click="ctrl.selectReconciliationMessage( 'incomplete' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select incomplete content</button>&nbsp;
-			<button ng-click="ctrl.selectReconciliationMessage( 'none' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Unselect all</button>&nbsp;
+			<!-- COMMENT -->
+			<table width="100%"><tr>
+				<td style="padding: 0px 30px 10px 10px;vertical-align: top">
+					<button ng-click="ctrl.selectMessage( 'all', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select all</button>&nbsp;
+			    	<button ng-click="ctrl.selectMessage( 'incomplete', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select incomplete messages</button>&nbsp;
+					<button ng-click="ctrl.selectMessage( 'complete', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select complete messages</button>&nbsp;
+					<button ng-click="ctrl.selectMessage( 'none', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Unselect all</button>&nbsp;
+					<a ng-click="ctrl.exportReconciliationData()" title="Click to export to Excel file"><img src="img/docexcel.gif" /></a></td>
 			
-			<button ng-click="ctrl.showDetailReconciliationMessage( 'show' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Show All details</button>&nbsp;
-			<button ng-click="ctrl.showDetailReconciliationMessage( 'hide' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Hide All details</button>&nbsp;
-			<a ng-click="ctrl.exportReconciliationData()" title="Click to export to Excel file"><img src="img/docexcel.gif" /></a>
-				
+				<td style="padding: 0px 30px 10px 10px;vertical-align: top;text-align:right">
+					<button ng-click="ctrl.showDetailMessage( 'show', ctrl.reconciliationmsg.detection.listmessages )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Show All details</button>&nbsp;
+					<button ng-click="ctrl.showDetailReconciliationMessage( 'hide' )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Hide All details</button></td>
+			</tr></table>
+		
 			<p>
 			<table>
 				<tr>
-					<td colspan="2"><input ng-model="ctrl.reconciliationmsg.purgeallrelatives" type="checkbox" title="Multiple incomplete messages may be send to match the event. By default, the page purge the same number of message_event than the number of event waiting. Click ALL means all message_instance with the same process/target/correlation is purge too">Purge ALL relatives message_instance (same target/flownode/correlations)</td>
+					<td colspan="2">
+						<input ng-model="ctrl.reconciliationmsg.purgeAllRelatives" type="checkbox" title="Multiple incomplete messages may be send to match the event. By default, the page purge the same number of message_event than the number of event waiting. Click ALL means all message_instance with the same process/target/correlation is purge too">Purge ALL relatives message_instance (same target/flownode/correlations)<br>
+						<input ng-model="ctrl.reconciliationmsg.sendincomplete" type="checkbox" title="For each incomplete message, a new complete message is send, and the message_instance is purged">Send Incomplete Messages<br>
+						<input ng-model="ctrl.reconciliationmsg.executecomplete" type="checkbox" title="For each INTERMEDIATE complete message, execution is force. Operations are verified, and variables are updated as much as possible">Execute Complete Message
+					</td>
 				</tr><tr>
 					<td>
 						<div ng-show="ctrl.inprogress"><span class="Loading">.</span></div></td>	
@@ -246,38 +295,36 @@
 								<option value="show">Show detail</option>
 								<option value="hide">Hide detail</option>
 							</select>
-						</td><td>{{ctrl.reconciliationmsg.execution.messagescorrects}}</td></tr>
-					<tr><td>Messages in error:</td><td>{{ctrl.reconciliationmsg.execution.messageserrors}}</td></tr>
-					<tr><td>Rows Message Data deleted:</td><td>{{ctrl.reconciliationmsg.execution.nbdatarowdeleted}}</td></tr>
-					<tr><td>Rows Message Instance deleted:</td><td>{{ctrl.reconciliationmsg.execution.nbdatamessagedeleted}}</td></tr>
+						</td>						<td style="text-align:right">{{ctrl.reconciliationmsg.execution.messagescorrects}}</td></tr>
+					<tr><td>Messages in error:</td>	<td style="text-align:right">{{ctrl.reconciliationmsg.execution.messageserrors}}</td></tr>
+					<tr><td>Rows Message Data deleted:</td><td style="text-align:right">{{ctrl.reconciliationmsg.execution.nbdatasrowdeleted}}</td></tr>
+					<tr><td>Rows Message Instance deleted:</td><td style="text-align:right">{{ctrl.reconciliationmsg.execution.nbmessagesrowdeleted}}</td></tr>
 					<tr><td colspan="2"> <div ng-bind-html="ctrl.getListEvents( ctrl.reconciliationmsg.execution.listevents )"></div></td></tr>
 					<tr ng-if="ctrl.reconciliationmsg.showdetailexecution">
 						<td colspan="2"> 
 							<table class="table table-bordered">
-								<tr><th>CaseId</th><th>Message name</th><th>Waiting ID</th><th>Message ID</th><th>Expl.</th><th>Status</th><th>Nb message sent.</tr>
-				
-								<tr ng-repeat="detail in ctrl.reconciliationmsg.execution.details">
-									<td style="">{{detail.caseid}}</td>
-				                    <td>{{detail.messagename}}</td>
-				                    <td style="text-align:right">{{detail.wid}}</td> 
-				                    <td style="text-align:right">{{detail.mid}}</td>
-				                    <td>{{detail.expl}}</td>
-				                    <td>{{detail.statusexec}}</td>
-				                    <td>{{detail.nbexecutioninprogress}}</td>
-					
-								</tr>
+								<tr><th>CaseId</th><th>Message name</th><th>Waiting ID</th><th>Message ID</th><th>Expl.</th><th>Status</th></tr>
+								<tbody ng-repeat="detail in ctrl.reconciliationmsg.execution.details"> 
+									<tr >
+										<td style="text-align:right">{{detail.caseid}}</td>
+					                    <td>{{detail.messagename}}</td>
+					                    <td style="text-align:right">{{detail.wid}}</td> 
+					                    <td style="text-align:right">{{detail.mid}}</td>
+					                    <td>{{detail.expl}}</td>
+					                    <td><div class="{{ctrl.getDetailBackground( detail )}}">{{detail.statusexec}}&nbsp;{{detail.nbexecutioninprogress}}&nbsp;msg</div></td>
+									</tr>
+									<tr>
+										<td colspan="4"></td>
+										<td colspan="2"><div style="font-style: italic;font-weight: bold;">{{detail.explexec}}</div><br>
+										
+										Message ID purged: {{detail.listmessageinstancerelativepurged}}</td>
+									</tr>
+								</tbody>
 							</table>
-					</td>
-					
-				</tr>
-				<tr ng-if="message.showdetail=='show'"><td></td><td colspan="5">
-					</td>
+						</td>					
+					</tr>
 				</table>
 			</div>
-			<!-- 
-			<div class="alert alert-success">{{ctrl.reconciliationmsg.detection.listmessages}}</div>
-			<div class="alert alert-warning">{{ctrl.sendPost}}</div>
-			 -->
 			
 		</div>
 									
@@ -294,7 +341,8 @@
 		
 			
 			 <div ng-bind-html="ctrl.getListEvents( ctrl.purgetablesmonitoring.monitoring.listevents )"></div>
-			
+
+				
 			<table class="table table-striped">
 				<tr><th>label</th><th>Nb Records</th><th>Nb Records purged</th><th>Explanations</th></tr>
 				<tbody ng-repeat="item in ctrl.purgetablesmonitoring.monitoring.listitems">
@@ -343,18 +391,63 @@
 						<li>Same process / target flow node</li>
 						<li>Same correlations key</li>
 						ATTENTION: it's maybe a normal situation. In BPMN, message must fit one case, and the business case can send multiple identical messages to unlock multiple cases with the same correlation.
+						SQLRequest:<br>
+						<div style="font-style: italic;">
+						 SELECT a.id, b.id as duplicate_id, a.*<br> 
+            from message_instance a, message_instance b <br>
+            where a.id < b.id <br>
+            and a.id = (select min(c.id) from message_instance c<br> 
+            where c.targetprocess = a.targetprocess<br>
+            and c.targetflownode = a.targetflownode<br>
+            and c.CORRELATION1 = a.CORRELATION1<br>
+            and c.CORRELATION2 = a.CORRELATION2<br>
+            and c.CORRELATION3 = a.CORRELATION3<br>
+            and c.CORRELATION4 = a.CORRELATION4<br>
+            and c.CORRELATION5 = a.CORRELATION5)<br>
+            and a.targetprocess = b.targetprocess <br>
+            and a.targetflownode = b.targetflownode <br>
+            and (a.CORRELATION1 != 'NONE' or a.CORRELATION2 != 'NONE' or a.CORRELATION3 != 'NONE' or a.CORRELATION4 != 'NONE' or a.CORRELATION5 != 'NONE')<br>
+            and a.CORRELATION1 = b.CORRELATION1 <br>
+            and a.CORRELATION2 = b.CORRELATION2 <br>
+            and a.CORRELATION3 = b.CORRELATION3 <br>
+            and a.CORRELATION4 = b.CORRELATION4 <br>
+            and a.CORRELATION5 = b.CORRELATION5 <br>
+            order by a.id, b.id<br>
+            			</div>
 					</div>
 				</td>
 				</tr>
 			</table>
 			
+			<div ng-bind-html="ctrl.getListEvents( ctrl.duplicationmsg.listevents )"></div><p>
+			<div>Result in {{ctrl.duplicationmsg.detection.performancemesure.total.time}} ms</div>
+			
+			<h1>Duplications</h1>
+		
+		
+			<!--  HEADER -->
+			<table width="100%"><tr>
+				<td style="padding: 0px 30px 10px 10px;vertical-align: top">
+					<button ng-click="ctrl.selectMessage( 'all', ctrl.duplicationmsg.detection.listduplications )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select all</button>&nbsp;
+					<button ng-click="ctrl.selectMessage( 'none', ctrl.duplicationmsg.detection.listduplications )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Unselect all</button>&nbsp;
+					<a ng-click="ctrl.exportDuplicateData()" title="Click to export to Excel file"><img src="img/docexcel.gif" /></a>
+			
+				<td style="padding: 0px 30px 10px 10px;vertical-align: top;text-align:right">
+					<button ng-click="ctrl.showDetailMessage( 'show', ctrl.duplicationmsg.detection.listduplications )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Show All details</button>&nbsp;
+					<button ng-click="ctrl.showDetailMessage( 'hide', ctrl.duplicationmsg.detection.listduplications )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Hide All details</button>&nbsp;
+				</td>
+			</tr></table>
+		
+			<!--  DATA -->		
 			<table class="table table-striped">
-				<tr><th></th><th>Process Name</th><th>Flow node Name</th><th>number of duplication</th><th>Correlations</th></tr>
+				<tr><th></th><th>Status</th><th>Process Name</th><th>Flow node Name</th><th>Message name</th><th>number of duplications</th><th>Correlations</th></tr>
 				<tbody ng-repeat="message in ctrl.duplicationmsg.detection.listduplications">
 				<tr>
 					<td><input ng-model="message.selected" type="checkbox"></td>
+					<td >{{message.statusexec}}</td>
 					<td >{{message.targetprocess}}</td>					
 					<td >{{message.targetflownode}}</td>					
+					<td >{{message.messagename}}</td>					
 					<td >{{message.nbduplications}}</td>			
 					<td >{{message.correlationvalues}}</td>	
 					<td ><select ng-model="message.showdetail">
@@ -363,13 +456,17 @@
 						</select>
 					</td>		
 				</tr>
-				<tr ng-if="message.showdetail">
+				<tr ng-if="message.showdetail == 'show'">
 					<td></td>
 					<td colspan="5"> 
 							<table class="table table-bordered">
-								<tr><th>WorkingId</th></tr>
+								<tr><th>WorkingId</th><th>Status</th></tr>
+								<tr><td style="background-color:#ecf0f1">{{message.originalid}}</td>
+									<td style="background-color:#ecf0f1"></td>
+								</tr>
 								<tr ng-repeat="detail in message.messagesduplicated">
-									<td>{{detail.wid}}</td>
+									<td>{{detail.mid}}</td>
+									<td><span class="{{ctrl.getDetailBackground( detail )}}">{{detail.statusexec}}</span></td>
 								</tr>
 							</table>
 					</td>
@@ -377,6 +474,63 @@
 					
 				</tbody>
 			</table>
+			
+			<table width="100%"><tr>
+				<td style="padding: 0px 30px 10px 10px;vertical-align: top">
+					<button ng-click="ctrl.selectMessage( 'all', ctrl.duplicationmsg.detection.listduplications )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Select all</button>&nbsp;
+					<button ng-click="ctrl.selectMessage( 'none', ctrl.duplicationmsg.detection.listduplications )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Unselect all</button>&nbsp;
+					<a ng-click="ctrl.exportDuplicateData()" title="Click to export to Excel file"><img src="img/docexcel.gif" /></a>
+			
+				<td style="padding: 0px 30px 10px 10px;vertical-align: top;text-align:right">
+					<button ng-click="ctrl.showDetailMessage( 'show', ctrl.duplicationmsg.detection.listduplications )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Show All details</button>&nbsp;
+					<button ng-click="ctrl.showDetailMessage( 'hide', ctrl.duplicationmsg.detection.listduplications )" class="btn btn-primary btn-xs" ng-disabled="ctrl.inprogress">Hide All details</button>&nbsp;
+				</td>
+			</tr></table>
+		
+		
+			<p>
+			<table>
+				<tr>
+					<td>
+						<div ng-show="ctrl.inprogress"><span class="Loading">.</span></div></td>	
+					<td><button ng-click="ctrl.deleteDuplicateMessages()" class="btn btn-warning" ng-disabled="ctrl.inprogress">Delete Duplicate Messages</button></td>
+				</tr>
+			</table>
+			<p>
+			<div class="progress">			
+				<div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="{{ctrl.sendPost.percent}}" aria-valuemin="0" aria-valuemax="100" 
+								style="width: {{ctrl.sendPost.percent}}%;"><span class="sr-only">({{ctrl.sendPost.percent}}%)</span></div>
+			</div>
+			
+			<h1>Deletion result</h1>
+			
+			<div ng-show="ctrl.duplicationmsg.showresult">
+				<table class="table table-stripped">
+					<tr><td>Deletion sent : 
+							<select ng-model="ctrl.duplicationmsg.showdetailexecution">
+								<option value="show">Show detail</option>
+								<option value="hide">Hide detail</option>
+							</select>
+						</td></tr>
+					<tr><td>Rows Message Data deleted:</td><td style="text-align:right">{{ctrl.duplicationmsg.execution.nbdatasrowdeleted}}</td></tr>
+					<tr><td>Rows Message Instance deleted:</td><td style="text-align:right">{{ctrl.duplicationmsg.execution.nbmessagesrowdeleted}}</td></tr>
+					<tr><td colspan="2"> <div ng-bind-html="ctrl.getListEvents( ctrl.duplicationmsg.execution.listevents )"></div></td></tr>
+					<tr ng-if="ctrl.duplicationmsg.showdetailexecution === 'show'">
+						<td colspan="2"> 
+							<table class="table table-bordered" style="width: 150px;">
+								<tr><th>Message Id</th></tr>
+								<tbody ng-repeat="detail in ctrl.duplicationmsg.execution.listmessageinstancepurged"> 
+								<tr >
+				                    <td style="text-align:right">{{detail}}</td>
+								</tr>
+								</tbody>
+							</table>
+					</td>
+					
+				</tr>
+				</table>
+			</div>
+		
 		
 		</div>					
 	  		<!--  ************************************************************  -->	
@@ -423,8 +577,8 @@
 
 <!-- Application dependencies -->
 <!-- to be sure to reload every time the JS file, add this marker -->
-<script src="pageResource?page=custompage_grumman&location=grummanmonitor.js&t=@_CURRENTTIMEMILIS_@"></script>
-
+<!--  <script src="pageResource?page=custompage_grumman&location=grummanmonitor.js&t=@_CURRENTTIMEMILIS_@"></script> -->
+<script src="grummanmonitor.js?&t=@_CURRENTTIMEMILIS_@"></script>
 
 <script type="text/javascript" src="https://cdn.jsdelivr.net/alasql/0.3/alasql.min.js"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.10.3/xlsx.full.min.js"></script>

@@ -54,6 +54,53 @@ appCommand.controller('GrummanControler',
 	}
 	
 	
+	// -----------------------------------------------------------------------------------------
+	//  									General tool
+	// -----------------------------------------------------------------------------------------
+
+
+	this.selectMessage = function( selection, listmessages ) 
+	{
+		console.log("selectMessage="+selection+" length="+listmessages.length);
+		for (var i in listmessages) {
+			// console.log(" set message "+i+" >"+i);
+			var message=listmessages[ i ];
+			if (selection === 'all' && message.status !== 'complete')
+				message.selected = true;
+			if (selection === 'none')
+				message.selected = false;
+			if (selection === 'incomplete')
+				message.selected = message.status==='incompletecontent';
+			if (selection === 'complete')
+				message.selected = message.status==='complete';
+		}
+	}
+	this.showDetailMessage = function( selection, listmessages ) 
+	{
+		console.log("showDetailMessage="+selection+" length="+listmessages.length);
+		for (var i in listmessages) {
+			// console.log(" set message "+i+" >"+i);
+			var message= listmessages[ i ];
+			message.showdetail = selection;
+		}
+	}
+	
+	this.getDetailBackground = function( detail ) {
+		if (detail.statusexec === "sended" || detail.statusexec === "sendedandpurge" || detail.statusexec === "purged")
+			return "label label-success";
+		if (detail.statusexec === "sendfailed")
+			return "label label-danger"; 
+		if (detail.statusexec === "duplicate")
+			return "label label-warning";
+		return "";
+	}
+	
+
+	// -----------------------------------------------------------------------------------------
+	//  									Synthesis
+	// -----------------------------------------------------------------------------------------
+
+	
 	this.getSynthesis = function()
 	{
 		var self=this;
@@ -83,7 +130,12 @@ appCommand.controller('GrummanControler',
 	//  									Incomplete Message
 	// -----------------------------------------------------------------------------------------
 
-	this.reconciliationmsg = { 'showdetailexecution':'hide', 'detection': {}, 'numberofmessages': 500, 'purgeallrelatives': true };
+	this.reconciliationmsg = { 'showdetailexecution':'hide', 
+			'detection': {}, 
+			'numberofmessages': 500, 
+			'purgeAllRelatives': true, 
+			'sendincomplete' : true,
+			'executecomplete' : true};
 	
 	this.getIncompleteReconciliationMessage = function()
 	{
@@ -104,8 +156,8 @@ appCommand.controller('GrummanControler',
 					}
 					console.log("incompletereconciliationmessage",jsonResult);
 					self.reconciliationmsg.detection 		= jsonResult;
-					self.selectReconciliationMessage( 'incomplete' );
-					self.showDetailReconciliationMessage( 'hide');
+					self.selectMessage( 'incomplete', self.reconciliationmsg.detection.listmessages );
+					self.showDetailMessage( 'hide', self.reconciliationmsg.detection.listmessages);
 					self.inprogress=false;
 				})
 				.error( function() {
@@ -115,7 +167,7 @@ appCommand.controller('GrummanControler',
 	}
 	
 	// temporaire direct call to get reconciliation message
-	this.getIncompleteReconciliationMessage();
+	// this.getIncompleteReconciliationMessage();
 	
 	
 	this.getReconciliationBackground = function( message ) {
@@ -129,41 +181,9 @@ appCommand.controller('GrummanControler',
 		return "background-color:#ecf0f1" // gray
 	}
 	
-	this.getReconciliationDetailBackground = function( detail ) {
-		if (detail.statusexec === "sended")
-			return "label label-success";
-		if (detail.statusexec === "sendfailed")
-			return "label label-danger"; 
-		if (detail.statusexec === "duplicate")
-			return "label label-warning";
-		return "";
-	}
 	
 	
 	
-	this.selectReconciliationMessage = function( selection ) 
-	{
-		console.log("selectReconciliationMessage="+selection+" length="+this.reconciliationmsg.detection.listmessages.length);
-		for (var i in this.reconciliationmsg.detection.listmessages) {
-			// console.log(" set message "+i+" >"+i);
-			var message=this.reconciliationmsg.detection.listmessages[ i ];
-			if (selection === 'all' && message.status !== 'complete')
-				message.selected = true;
-			if (selection === 'none')
-				message.selected = false;
-			if (selection === 'incomplete')
-				message.selected = message.status==='incompletecontent';
-		}
-	}
-	this.showDetailReconciliationMessage = function( selection ) 
-	{
-		console.log("selectReconciliationMessage="+selection+" length="+this.reconciliationmsg.detection.listmessages.length);
-		for (var i in this.reconciliationmsg.detection.listmessages) {
-			// console.log(" set message "+i+" >"+i);
-			var message=this.reconciliationmsg.detection.listmessages[ i ];
-			message.showdetail = selection;
-		}
-	}
 	
 	
 	this.sendIncompleteReconciliationMessage= function () {
@@ -176,7 +196,10 @@ appCommand.controller('GrummanControler',
 		console.log("listKeyGroup="+list);
 		var listKey = {'keysgroup' : list, 
 				'numberofmessages':this.reconciliationmsg.numberofmessages, 
-				'purgeallrelatives': this.reconciliationmsg.purgeAllRelatives};
+				'purgeallrelatives': this.reconciliationmsg.purgeAllRelatives,
+				'sendincomplete': this.reconciliationmsg.sendincomplete,
+				'executecomplete': this.reconciliationmsg.executecomplete
+		};
 		this.inprogress=true;
 		this.reconciliationmsg.showresult=false;
 		this.sendPostAction(this, listKey, 'postSendReconciliation', 'sendincompletemessage')
@@ -208,7 +231,8 @@ appCommand.controller('GrummanControler',
 					// console.log("     detail wid="+detail.wid+" <> "+detailexec.wid +" mid="+detail.mid+" <> "+detailexec.mid);
 					if (detailexec.wid === detail.wid && detailexec.mid === detail.mid) {
 						// console.log("  MATCH");
-						detail.statusexec				= detailexec.statusexec;						
+						detail.statusexec				= detailexec.statusexec;
+						detail.explexec					= detailexec.explexec;
 						detail.nbexecutioninprogress	= detailexec.nbexecutioninprogress;
 						foundexec=true;
 					}
@@ -299,7 +323,8 @@ appCommand.controller('GrummanControler',
 	this.duplicationmsg = {
 			'maximumnumberofduplications':500,
 			'detection' : {},
-			'execution' : {}
+			'execution' : {},
+			'showdetailexecution' : 'hide'
 	}
 	this.getListDuplicateMessages = function() {
 		console.log("start getListDuplicateMessages");
@@ -319,6 +344,9 @@ appCommand.controller('GrummanControler',
 					}
 					console.log("searchDuplication",jsonResult);
 					self.duplicationmsg.detection 		= jsonResult;
+					self.selectMessage( 'none', self.duplicationmsg.detection.listduplications);
+					self.showDetailMessage( 'hide', self.duplicationmsg.detection.listduplications);
+										
 					self.inprogress=false;
 				})
 				.error( function() {
@@ -327,19 +355,21 @@ appCommand.controller('GrummanControler',
 				
 	}
 	
-	this.deleteduplicatemessages = function() {
+	this.deleteDuplicateMessages = function() {
 		console.log("start deleteduplicatemessages");
 		var self=this;
 		self.inprogress=true;
 
 		// 7.6 : the server force a cache on all URL, so to bypass the cache, then create a different URL
 		var d = new Date();
-		action="deleteduplicatemessages";
 		var list= [];
 		
-		for (var i in this.duplicationmsg.list) {
-			if (this.duplicationmsg.list[ i ].selected)
-				list.push( this.duplicationmsg.list[ i ].id );
+		for (var i in this.duplicationmsg.detection.listduplications) {
+			if (this.duplicationmsg.detection.listduplications[ i ].selected) {
+				for (var j in this.duplicationmsg.detection.listduplications[ i ].messagesduplicated) {
+					list.push( this.duplicationmsg.detection.listduplications[ i ].messagesduplicated[ j ].mid );
+				}
+			}
 		}
 		console.log("listIdToPurge="+list);
 		var listKey = {'keys' : list};
@@ -349,9 +379,47 @@ appCommand.controller('GrummanControler',
 	
 	
 	this.postSendDuplicateMessage = function( result ) {
-		console.log("postSendDuplicateMessage");
-		this.duplicationmsg.showresult=true;
+		// console.log("postSendDuplicateMessage -------------- ");
+		this.duplicationmsg.showresult= true ;
+		
 		this.duplicationmsg.execution = result; 
+		
+		
+		// apply the statusExec on each message
+		for (var i in this.duplicationmsg.detection.listduplications) {
+			var message = this.duplicationmsg.detection.listduplications[ i ];
+			// console.log("Check message");
+
+			var allexecution=true;
+			for (var j in message.messagesduplicated) {
+				var detail = message.messagesduplicated[ j ];
+				// if this message was executed?
+				// console.log("  Check Detail mid="+detail.mid);
+
+				var foundexec=false;
+				for (var k in this.duplicationmsg.execution.listmessageinstancepurged) {
+					var detailexec = this.duplicationmsg.execution.listmessageinstancepurged[ k ];
+					// console.log("     detail mid="+detail.mid+" <> "+detailexec);
+					if (detailexec === detail.mid) {
+						// console.log("  MATCH");
+						detail.statusexec				= "purged";						
+						foundexec=true;
+					}
+				}
+
+				if (foundexec) {
+				} else {
+					allexecution=false;
+				}
+				// console.log("  Result Detail:"+detail.mid+" FoundExec:"+foundexec+" allexecution"+allexecution);
+
+			} // end details
+			
+			if (allexecution) {
+				message.statusexec="(purged)";
+			}
+		}
+		
 	}
 	
 	
@@ -432,7 +500,10 @@ appCommand.controller('GrummanControler',
 					if (self.sendPost.postAction === 'postSendReconciliation') {
 						self.postSendReconciliation( jsonResult );
 					}
-						
+					if (self.sendPost.postAction === 'postSendDuplicateMessage') {
+						self.postSendDuplicateMessage( jsonResult );
+					}
+					
 					// post depending of the action
 					
 				}
@@ -484,8 +555,44 @@ appCommand.controller('GrummanControler',
         //Create XLS format using alasql.js file.  
         alasql('SELECT * INTO XLS("Process_' + $scope.CurrentDateTime + '.xls",?) FROM ?', [mystyle, trackingJson]);  
     };
-    
-
+    this.exportDuplicateData = function() 
+    {  
+		//Start*To Export SearchTable data in excel  
+	// create XLS template with your field.  
+		var mystyle = {         
+        headers:true,        
+			columns: [  
+			{ columnid: 'messagename', title: 'Message Name'},
+			{ columnid: 'targetprocess', title: 'Target process'},
+			{ columnid: 'targetflownode', title: 'Target FlowNode'},
+			{ columnid: 'correlationvalues', title: 'Correlation values'},
+			{ columnid: 'nbduplications', title: 'nbDuplications'},
+			{ columnid: 'originalid', title: 'original Message ID'},
+			{ columnid: 'messagesduplicatedst', title: 'Messages duplicated'},
+			{ columnid: 'statusexec', title: 'Status Execution'}
+			],         
+		};  
+	
+        //get current system date.         
+        var date = new Date();  
+        $scope.CurrentDateTime = $filter('date')(new Date().getTime(), 'MM/dd/yyyy HH:mm:ss');          
+		var trackingJson = [];
+		for (var i in this.duplicationmsg.detection.listduplications) {
+			var message= this.duplicationmsg.detection.listduplications[ i ];
+			var detailsmerged = {...message };
+			detailsmerged.messagesduplicatedst='';
+			for (var j in message.messagesduplicated) {
+				detailsmerged.messagesduplicated = detailsmerged.messagesduplicated + message.messagesduplicated[ j ].mid+",";
+				console.log("Export, add "+message.messagesduplicated[ j ].mid+" => "+detailsmerged.messagesduplicated )
+			}
+			console.log("Detail="+angular.toJson( detailsmerged ));
+			
+			trackingJson.push( detailsmerged );
+			
+		}
+        //Create XLS format using alasql.js file.  
+        alasql('SELECT * INTO XLS("Process_' + $scope.CurrentDateTime + '.xls",?) FROM ?', [mystyle, trackingJson]);  
+    };
 	// -----------------------------------------------------------------------------------------
 	//  										Properties
 	// -----------------------------------------------------------------------------------------
