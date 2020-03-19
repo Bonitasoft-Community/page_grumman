@@ -236,6 +236,12 @@ order by m.id, w.id, w_lastupdatedate; <br>
 		                    		<br>Execution:
 		                    			{{detail.explexec}}
 		                    	</div>
+		                    	<div ng-if="detail.explerror.length>0" style="font-style: italic;font-weight: bold;color: #e00606">
+		                    		<br>Errors:
+		                    			{{detail.explerror}}
+		                    	</div>
+		                    	
+		                    	
 		                    </td>
 		                    <td >
 		                    

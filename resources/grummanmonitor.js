@@ -65,7 +65,7 @@ appCommand.controller('GrummanControler',
 		for (var i in listmessages) {
 			// console.log(" set message "+i+" >"+i);
 			var message=listmessages[ i ];
-			if (selection === 'all' && message.status !== 'complete')
+			if (selection === 'all' )
 				message.selected = true;
 			if (selection === 'none')
 				message.selected = false;
@@ -233,7 +233,9 @@ appCommand.controller('GrummanControler',
 						// console.log("  MATCH");
 						detail.statusexec				= detailexec.statusexec;
 						detail.explexec					= detailexec.explexec;
+						detail.explerror				= detailexec.explerror;
 						detail.nbexecutioninprogress	= detailexec.nbexecutioninprogress;
+						
 						foundexec=true;
 					}
 				}
@@ -535,8 +537,10 @@ appCommand.controller('GrummanControler',
 			{ columnid: 'messagename', title: 'Message Name'},
 			{ columnid: 'wid', title: 'Waiting Id'},
 			{ columnid: 'mid', title: 'Message Id'},
-			{ columnid: 'expl', title: 'Explanation'},
-			{ columnid: 'statusexec', title: 'Status Execution'}
+			{ columnid: 'expl', title: 'Explanation'},		
+			{ columnid: 'explerror', title: 'Errors'},
+			{ columnid: 'explexec', title: 'Explication execution'},
+			{ columnid: 'statusexec', title: 'Status Execution'},
 			],         
 		};  
 	

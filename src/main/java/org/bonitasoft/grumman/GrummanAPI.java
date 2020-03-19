@@ -1,29 +1,41 @@
 package org.bonitasoft.grumman;
 
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
 import org.bonitasoft.engine.api.ProcessAPI;
 import org.bonitasoft.grumman.duplicate.DuplicateMessageInstance;
+import org.bonitasoft.grumman.message.Message;
 import org.bonitasoft.grumman.message.MessagesFactory;
+import org.bonitasoft.grumman.message.MessagesFactory.SynthesisOnMessage;
 import org.bonitasoft.grumman.purge.PurgeTablesMessage;
 import org.bonitasoft.grumman.reconciliation.ReconcilationMessage;
 import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.ReconcialiationFilter;
 import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.ReconcialiationFilter.TYPEFILTER;
+import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.ResultExecution;
+import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.ResultMessageOperation;
+
 import org.json.simple.JSONValue;
 
 import lombok.Data;
 
 public class GrummanAPI {
 
-    private final static Logger logger = Logger.getLogger(MessagesFactory.class.getName());
+    private final static Logger logger = Logger.getLogger(GrummanAPI.class.getName());
 
     private static String loggerLabel = "GrummanAPI ##";
 
     /**
      * All JSON constant exchanded with the page
      */
+    public static final String CSTJSON_LISTMESSAGES = "listmessages";
+    public static final String CSTJSON_NBCOMPLETEMESSAGES="nbCompleteMessages";
+    public static final String CSTJSON_NBINCOMPLETEMESSAGE ="nbIncompleteMessages";
+
+    public static final String CSTJSON_NBMESSAGE = "nbmessage";
     public static final String CSTJSON_LISTEVENTS= "listevents";
     public static final String CSTJSON_NBRECONCILIATIONS= "nbReconciliations";
     public static final String CSTJSON_WID = "wid";
@@ -36,21 +48,33 @@ public class GrummanAPI {
     public static final String CSTJSON_LISTMESSAGEINSTANCEPURGED= "listmessageinstancepurged";
     public static final String CSTJSON_STATUSEXEC = "statusexec";
 
+    public static final String CSTJSON_PROCESSNAME="processname";
+    public static final String CSTJSON_PROCESSVERSION="processversion";
+    public static final String CSTJSON_FLOWNAME="flowname";
+    
+    public static final String CSTJSON_NUMBEROFMESSAGES="numberofmessages";
+    public static final String CSTJSON_KEYGROUP="keygroup";
+
+    
     public static final String CSTJSON_MESSAGENAME = "messagename";
     public static final String CSTJSON_CATCHEVENTTYPE ="catcheventtype";
     public static final String CSTJSON_EXPL = "expl";
     public static final String CSTJSON_EXPLEXEC = "explexec";
+    public static final String CSTJSON_EXPLERROR= "explerror";
     public static final String CSTJSON_CORRELATIONVALUES = "correlationvalues";
     public static final String CSTJSON_SIGNATURENBMESSAGEINSTANCE = "signaturenbmessageinstance";
     public static final String CSTJSON_SIGNATURENBWAITINGEVENT ="signaturenbwaitingevent";
-
     
     public static final String CSTJSON_PERFORMANCEMESURE = "performancemesure";
     public static final String CSTJSON_PERFORMANCEMESURETOTAL = "total";
 
+    public static final String CSTJSON_DETAILS = "details";
+    
     public static final String CSTJSON_NB_DATASROW_DELETED = "nbdatasrowdeleted";
     public static final String CSTJSON_ND_MESSAGESROW_DELETED ="nbmessagesrowdeleted";
-    
+    public static final String CSTJSON_MESSAGES_ERRORS="messageserrors";
+    public static final String CSTJSON_MESSAGES_CORRECTS="messagescorrects";
+ 
     
     public static final String CSTJSON_LISTDUPLICATION = "listduplications";
     public static final String CSTJSON_NBMESSAGEDUPLICATED ="nbMessagesDuplicated";            
@@ -68,6 +92,9 @@ public class GrummanAPI {
     public Map<String, Object> getSynthesis() {
         return messageFactory.getSynthesis().getMap();
     }
+    public SynthesisOnMessage getSynthesisMessage() {
+        return messageFactory.getSynthesis();
+    }
 
     /* -------------------------------------------------------------------- */
     /*                                                                      */
@@ -76,18 +103,27 @@ public class GrummanAPI {
     /* -------------------------------------------------------------------- */
 
     public Map<String, Object> getIncompleteReconciliationMessage(int numberOfMessages, ProcessAPI processAPI) {
-        ReconcilationMessage reconciliation = new ReconcilationMessage();
         ReconcialiationFilter reconciliationFilter = new ReconcialiationFilter( TYPEFILTER.MAXMESSAGES);
         reconciliationFilter.numberOfMessages = (numberOfMessages<10 ? 10 : numberOfMessages);
-        return reconciliation.getListIncompleteMessage(reconciliationFilter, processAPI).getGroupByMap();
+        
+        ResultMessageOperation resultMessageOperation =  getIncompleteReconciliationMessage( reconciliationFilter, processAPI);
+        return resultMessageOperation.getGroupByMap();
+        
 
     }
+    
+    public ResultMessageOperation getIncompleteReconciliationMessage(ReconcialiationFilter reconciliationFilter, ProcessAPI processAPI) {
+        ReconcilationMessage reconciliation = new ReconcilationMessage();
+        return reconciliation.getListIncompleteMessage(reconciliationFilter, processAPI);
+        
+    }
+    
 
     public static @Data class MessagesList {
         
         private List<String> listKeys = null;
         private List<String> listKeysGroups = null;
-        private int numberofmessages=-1;
+        private int numberOfMessages=-1;
         /** 
          * It may have multiple (BAD) message_event with the same key. Let's say there are for 2 waiting event, 10 messages_event. 
          * So, 2 messages is sent to unlock the 2 waiting_event. Do we purge only 2 message_event or ALL message events? 
@@ -97,10 +133,18 @@ public class GrummanAPI {
         private boolean sendincomplete = false;
         private boolean executecomplete = false;
         
-        
+      
+        public static MessagesList getInstanceFromResultMessageOperation(ResultMessageOperation resultMessageOperation ) {
+            MessagesList messagesList = new MessagesList();
+            Map<String, List<Message>> mapMessages = resultMessageOperation.getMessageByGroup();
+            messagesList.listKeysGroups = new ArrayList<>();
+            messagesList.listKeysGroups.addAll( mapMessages.keySet());
+            return messagesList;
+          }
+            
         @SuppressWarnings({ "unchecked", "rawtypes" })        
         public static MessagesList getInstanceFromJson(String jsonSt ) {
-            logger.info( loggerLabel+" decodeFromJsonSt : JsonSt[" + jsonSt + "]");
+            logger.fine( loggerLabel+" decodeFromJsonSt : JsonSt[" + jsonSt + "]");
             MessagesList messagesList = new MessagesList();
 
             if (jsonSt == null) {
@@ -120,25 +164,14 @@ public class GrummanAPI {
             
             messagesList.listKeys = mapObject.containsKey("keys")? (List) mapObject.get("keys"):null;
             messagesList.listKeysGroups = mapObject.containsKey("keysgroup")? (List) mapObject.get("keysgroup"):null;
-            messagesList.numberofmessages   =  MessagesFactory.getLong( mapObject.get("numberofmessages"),-1L).intValue();
+            messagesList.numberOfMessages   =  MessagesFactory.getLong( mapObject.get("numberofmessages"),-1L).intValue();
             messagesList.purgeAllRelativesId =  MessagesFactory.getBoolean( mapObject.get("purgeallrelatives"), false);
             messagesList.sendincomplete =  MessagesFactory.getBoolean( mapObject.get("sendincomplete"), false);
             messagesList.executecomplete =  MessagesFactory.getBoolean( mapObject.get("executecomplete"), false);
 
             return messagesList;
         }
-        public int getNumberOfMessages() {
-            return numberofmessages;
-        }
-        public boolean getPurgeAllRelatives() {
-            return purgeAllRelativesId;
-        }
-        public List<String> getListKeys() {
-            return listKeys;
-        }
-        public List<String> getListKeysGroup() {
-            return listKeysGroups;
-        }
+       
         public boolean isBorrowKeys() {
             return listKeys != null;
         }
@@ -155,9 +188,12 @@ public class GrummanAPI {
      * @return
      */
     public Map<String, Object> sendIncompleteReconcialiationMessage( MessagesList messagesList, ProcessAPI processAPI) {
-        ReconcilationMessage reconciliation = new ReconcilationMessage();
-        return reconciliation.executeIncompleteMessage( messagesList, processAPI).getMap();
+        return executeReconcialiationMessage( messagesList, processAPI).getMap();
+    }
 
+    public ResultExecution executeReconcialiationMessage( MessagesList messagesList, ProcessAPI processAPI) {
+        ReconcilationMessage reconciliation = new ReconcilationMessage();
+        return reconciliation.executeIncompleteMessage( messagesList, processAPI);
     }
 
     

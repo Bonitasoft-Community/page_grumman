@@ -23,6 +23,34 @@ public class OperationCorrSendCompleteMessage extends OperationCorr {
     private static String loggerLabel = "OperationSendCompleteMessage ##";
     private final static BEvent eventSendMessageError = new BEvent(OperationCorrSendCompleteMessage.class.getName(), 1, Level.ERROR, "Send error", "Error when a message is send", "Message is not sended", "Check error");
     
+    @Override
+    public ResultOperationCorr detectErrorInMessage( Message message, ProcessAPI processAPI) {
+        ResultOperationCorr resultOperation = new ResultOperationCorr();
+        StringBuilder resultDetection = new StringBuilder();
+        boolean errorDetected=false;
+        resultDetection.append("DesignKey: " + message.designContent);
+        resultDetection.append(", MessageKey:");
+        boolean first = true;
+        for (String key : message.messageInstanceVariables.keySet()) {
+            if (!first)
+                resultDetection.append(",");
+            first = false;
+            resultDetection.append("[" + key + "]");
+        }
+        resultDetection.append(" MissingKey:");
+        for (String key : message.designContent) {
+            message.completeMessage.put(key, message.messageInstanceVariables.get(key));
+            if (!message.messageInstanceVariables.containsKey(key)) {
+                errorDetected = true;
+                resultDetection.append("[" + key + "]");
+            }
+        }
+        if (errorDetected)
+            resultOperation.errorsDetected = resultDetection;
+        else
+            resultOperation.explanations = resultDetection;
+        return resultOperation;
+    }
     /* -------------------------------------------------------------------- */
     /*                                                                      */
     /* Send message */
@@ -34,7 +62,7 @@ public class OperationCorrSendCompleteMessage extends OperationCorr {
         try {
 
             Expression targetProcess = new ExpressionBuilder().createConstantStringExpression(message.getTargetProcessName());
-            Expression targetFlowNode = new ExpressionBuilder().createConstantStringExpression(message.targetFlowNodeName);
+            Expression targetFlowNode = new ExpressionBuilder().createConstantStringExpression(message.getTargetFlowNodeName());
             List<ExpressionDescription> listExpressions = new ArrayList<>();
             if (message.completeMessage!=null) {
                 for (Entry<String, Object> entry : message.completeMessage.entrySet()) {
@@ -72,7 +100,7 @@ public class OperationCorrSendCompleteMessage extends OperationCorr {
                 }
                     
                 Map<Expression, Expression> messageCorrelations = createMapExpression(listExpressions);
-                logger.info( loggerLabel+" Send message["+ message.getMessageName()+"] targetProcess["+ message.getTargetProcessName()+"] FlowName["+ message.targetFlowNodeName+"] RootCaseId["+ message.rootProcessInstanceId+"]"+traceCorrelation);
+                logger.info( loggerLabel+" Send message["+ message.getMessageName()+"] targetProcess["+ message.getTargetProcessName()+"] FlowName["+ message.getTargetFlowNodeName()+"] RootCaseId["+ message.rootProcessInstanceId+"]"+traceCorrelation);
                 processAPI.sendMessage( message.getMessageName(), targetProcess, targetFlowNode, messageContent, messageCorrelations);
                 
                 
@@ -91,4 +119,6 @@ public class OperationCorrSendCompleteMessage extends OperationCorr {
        
         return resultOperation;
     }
+
+    
 }

@@ -28,12 +28,14 @@ import org.bonitasoft.log.event.BEvent;
 import org.bonitasoft.log.event.BEvent.Level;
 import org.bonitasoft.log.event.BEventFactory;
 
+import lombok.Data;
+
 public class ReconcilationMessage {
 
     private final static BEvent eventSqlNoMessagesSelected = new BEvent(ReconcilationMessage.class.getName(), 1, Level.APPLICATIONERROR, "No messages selected", "Select minimum one message", "", "Select one message");
     private final static BEvent eventOperationCorrectionFailed = new BEvent(ReconcilationMessage.class.getName(), 2, Level.ERROR, "Operation Correction failed", "Operation to correct a message failed", "The message can't be executed", "Check exception");
 
-    public static class ResultMessageOperation {
+    public @Data static class ResultMessageOperation {
 
         protected List<BEvent> listEvents = new ArrayList<>();
         protected List<Message> listMessages = new ArrayList<>();
@@ -49,35 +51,41 @@ public class ReconcilationMessage {
             for (Message message : listMessages)
                 listMessageMap.add(message.getMap());
 
-            result.put("listmessages", listMessageMap);
-            result.put("nbmessage", listMessages.size());
-            result.put(GrummanAPI.CSTJSON_LISTEVENTS, BEventFactory.getSyntheticHtml(listEvents));
-            result.put(GrummanAPI.CSTJSON_NBRECONCILIATIONS, nbReconciliations);
-            result.put("nbCompleteMessages", nbCompleteMessages);
-            result.put("nbIncompleteMessages", nbIncompleteMessages);
+            result.put( GrummanAPI.CSTJSON_LISTMESSAGES, listMessageMap);
+            result.put( GrummanAPI.CSTJSON_NBMESSAGE, listMessages.size());
+            result.put( GrummanAPI.CSTJSON_LISTEVENTS, BEventFactory.getSyntheticHtml(listEvents));
+            result.put( GrummanAPI.CSTJSON_NBRECONCILIATIONS, nbReconciliations);
+            result.put( GrummanAPI.CSTJSON_NBCOMPLETEMESSAGES, nbCompleteMessages);
+            result.put( GrummanAPI.CSTJSON_NBINCOMPLETEMESSAGE, nbIncompleteMessages);
 
             return result;
         }
 
-        public Map<String, Object> getGroupByMap() {
-            // result are grouped per processname/processversion/flownodename
-            Map<String, Object> result = new HashMap<>();
-            Map<String, List<Message>> mapMessages = new HashMap<>();
+        
+        public Map<String, List<Message>> getMessageByGroup() { 
+            Map<String, List<Message>>mapMessages = new HashMap<>();
             for (Message message : listMessages) {
-                String key = message.getTargetProcessName() + "#" + message.currentProcessVersion + "#" + message.targetFlowNodeName + "#" + message.getStatus().toString();
+                String key = message.getTargetProcessName() + "#" + message.getCurrentProcessVersion() + "#" + message.getTargetFlowNodeName() + "#" + message.getStatus().toString();
                 List<Message> list = mapMessages.containsKey(key) ? mapMessages.get(key) : new ArrayList<>();
                 list.add(message);
                 mapMessages.put(key, list);
             }
+            return mapMessages;
+        }
+        public Map<String, Object> getGroupByMap() {
+            // result are grouped per processname/processversion/flownodename
+            Map<String, Object> result = new HashMap<>();
+            Map<String, List<Message>> mapMessages = getMessageByGroup();
+
             List<Map<String, Object>> listMessageGroupBy = new ArrayList<>();
             for (List<Message> listMessage : mapMessages.values()) {
                 Map<String, Object> oneSynthesis = new HashMap<>();
-                oneSynthesis.put("processname", listMessage.get(0).getTargetProcessName());
-                oneSynthesis.put("processversion", listMessage.get(0).currentProcessVersion);
-                oneSynthesis.put("flowname", listMessage.get(0).targetFlowNodeName);
-                oneSynthesis.put(GrummanAPI.CSTJSON_STATUS, listMessage.get(0).getStatusForJson());
-                oneSynthesis.put("numberofmessages", listMessage.size());
-                oneSynthesis.put("keygroup", listMessage.get(0).getKeyGroup());
+                oneSynthesis.put( GrummanAPI.CSTJSON_PROCESSNAME, listMessage.get(0).getTargetProcessName());
+                oneSynthesis.put( GrummanAPI.CSTJSON_PROCESSVERSION, listMessage.get(0).getCurrentProcessVersion());
+                oneSynthesis.put( GrummanAPI.CSTJSON_FLOWNAME, listMessage.get(0).getTargetFlowNodeName());
+                oneSynthesis.put( GrummanAPI.CSTJSON_STATUS, listMessage.get(0).getStatusForJson());
+                oneSynthesis.put( GrummanAPI.CSTJSON_NUMBEROFMESSAGES, listMessage.size());
+                oneSynthesis.put( GrummanAPI.CSTJSON_KEYGROUP, listMessage.get(0).getKeyGroup());
                 if (listMessage.get(0).catchEventType != null)
                     oneSynthesis.put(GrummanAPI.CSTJSON_CATCHEVENTTYPE, listMessage.get(0).catchEventType.toString().toLowerCase());
 
@@ -89,8 +97,9 @@ public class ReconcilationMessage {
                     oneMessage.put(GrummanAPI.CSTJSON_MESSAGENAME, message.getMessageName());
                     oneMessage.put(GrummanAPI.CSTJSON_WID, message.getWaitingId());
                     oneMessage.put(GrummanAPI.CSTJSON_MID, +message.getMessageId());
-                    oneMessage.put(GrummanAPI.CSTJSON_EXPL, message.getIncompleteDetail().toString());
+                    oneMessage.put(GrummanAPI.CSTJSON_EXPL, message.getExplanationDetail().toString());
                     oneMessage.put(GrummanAPI.CSTJSON_EXPLEXEC, message.getExecutionDetail().toString());
+                    oneMessage.put(GrummanAPI.CSTJSON_EXPLERROR, message.explanationError.toString());
 
                     oneMessage.put(GrummanAPI.CSTJSON_CORRELATIONVALUES, message.getCorrelationSignature(Message.CST_DEFAULTJSON_KEEPNONE_CORRELATIONSIGNATURE));
                     oneMessage.put(GrummanAPI.CSTJSON_SIGNATURENBMESSAGEINSTANCE, message.getSameSignatureNbMessageInstance());
@@ -100,7 +109,7 @@ public class ReconcilationMessage {
                 // sort the detail
                 MessagesFactory.sortMyList(listDetails, new String[] { GrummanAPI.CSTJSON_CASEID, GrummanAPI.CSTJSON_MESSAGENAME, GrummanAPI.CSTJSON_WID });
 
-                oneSynthesis.put("details", listDetails);
+                oneSynthesis.put( GrummanAPI.CSTJSON_DETAILS, listDetails);
                 listMessageGroupBy.add(oneSynthesis);
             }
 
@@ -185,7 +194,7 @@ public class ReconcilationMessage {
             perfDesign.stop();
 
             if (!listEventDesign.isEmpty()) {
-                String keyEvent = message.getTargetProcessName() + "#" + message.currentProcessVersion + "#" + message.targetFlowNodeName;
+                String keyEvent = message.getTargetProcessName() + "#" + message.getCurrentProcessVersion() + "#" + message.getTargetFlowNodeName();
                 if (!filterOnEventProcess.contains(keyEvent))
                     result.listEvents.addAll(listEventDesign);
                 filterOnEventProcess.add(keyEvent);
@@ -198,27 +207,34 @@ public class ReconcilationMessage {
                 // if all information are fullfill?
                 message.isComplete = true;
                 if (message.designContent != null && message.getStatus() != enumStatus.FAILEDDESIGN) {
+                    
+                    OperationCorr operationCompleteMessage = new OperationCorrSendCompleteMessage();
+                    ResultOperationCorr detectionErrors = operationCompleteMessage.detectErrorInMessage( message, processAPI);
+                    if (detectionErrors.isError())
+                    {
+                        message.isComplete = false;
+                        message.explanationDetail.append(detectionErrors.getExplanations());
+                        message.explanationError.append( detectionErrors.getErrorsDetected());
+                    }
 
-                    message.incompleteDetail.append("DesignKey: " + message.designContent);
-                    message.incompleteDetail.append(", MessageKey:");
-                    boolean first = true;
-                    for (String key : message.messageInstanceVariables.keySet()) {
-                        if (!first)
-                            message.incompleteDetail.append(",");
-                        first = false;
-                        message.incompleteDetail.append("[" + key + "]");
-                    }
-                    message.incompleteDetail.append(" MissingKey:");
-                    for (String key : message.designContent) {
-                        message.completeMessage.put(key, message.messageInstanceVariables.get(key));
-                        if (!message.messageInstanceVariables.containsKey(key)) {
-                            message.isComplete = false;
-                            message.incompleteDetail.append("[" + key + "]");
-                        }
-                    }
 
                     if (message.isComplete) {
                         result.nbCompleteMessages++;
+                        
+                        // get the explication 
+                        OperationCorr operation = getOperationToSolvedMessage(message);
+                        if (operation !=null) {
+                            detectionErrors  = operation.detectErrorInMessage( message, processAPI);
+                            if (detectionErrors.isError()) {
+                                message.explanationDetail.append( detectionErrors.getExplanations());
+                                message.explanationError.append( detectionErrors.getErrorsDetected());
+                            }
+                            else {
+                                message.explanationDetail.append(detectionErrors.getExplanations());
+                                message.explanationError.append("Operations are corrects, another error must occur");
+                            }
+                                
+                        }
                         message.setStatus(enumStatus.COMPLETE);
                     } else {
                         result.nbIncompleteMessages++;
@@ -238,14 +254,14 @@ public class ReconcilationMessage {
      * 
      *
      */
-    public class ResultExecution {
+    public @Data class ResultExecution {
 
-        List<Message> listMessages = new ArrayList<>();
-        List<BEvent> listEvents = new ArrayList<>();
-        public int nbMessagesErrors = 0;
-        public int nbMessagesCorrects = 0;
-        public int nbDatasRowDeleted = 0;
-        public int nbMessagesRowDeleted = 0;
+        private List<Message> listMessages = new ArrayList<>();
+        private List<BEvent> listEvents = new ArrayList<>();
+        private int nbMessagesErrors = 0;
+        private int nbMessagesCorrects = 0;
+        private  int nbDatasRowDeleted = 0;
+        private  int nbMessagesRowDeleted = 0;
 
         protected PerformanceMesureSet performanceMesure = new PerformanceMesureSet();
 
@@ -257,11 +273,11 @@ public class ReconcilationMessage {
 
         public Map<String, Object> getMap() {
             Map<String, Object> result = new HashMap<>();
-            result.put("messageserrors", nbMessagesErrors);
-            result.put("messagescorrects", nbMessagesCorrects);
-            result.put(GrummanAPI.CSTJSON_NB_DATASROW_DELETED, nbDatasRowDeleted);
-            result.put(GrummanAPI.CSTJSON_ND_MESSAGESROW_DELETED, nbMessagesRowDeleted);
-            result.put(GrummanAPI.CSTJSON_LISTEVENTS, BEventFactory.getHtml(listEvents));
+            result.put( GrummanAPI.CSTJSON_MESSAGES_ERRORS, nbMessagesErrors);
+            result.put( GrummanAPI.CSTJSON_MESSAGES_CORRECTS, nbMessagesCorrects);
+            result.put( GrummanAPI.CSTJSON_NB_DATASROW_DELETED, nbDatasRowDeleted);
+            result.put( GrummanAPI.CSTJSON_ND_MESSAGESROW_DELETED, nbMessagesRowDeleted);
+            result.put( GrummanAPI.CSTJSON_LISTEVENTS, BEventFactory.getHtml(listEvents));
 
             List<Map<String, Object>> listDetails = new ArrayList<>();
 
@@ -277,14 +293,15 @@ public class ReconcilationMessage {
                 oneMessage.put(GrummanAPI.CSTJSON_LISTMESSAGEINSTANCERELATIVE, message.getListIdMessageInstanceRelative());
                 oneMessage.put(GrummanAPI.CSTJSON_LISTMESSAGEINSTANCERELATIVEPURGED, message.getListIdMessageInstanceRelativePurged() );
 
-                oneMessage.put( GrummanAPI.CSTJSON_EXPL, message.incompleteDetail.toString());
+                oneMessage.put( GrummanAPI.CSTJSON_EXPL, message.explanationDetail.toString());
                 oneMessage.put(GrummanAPI.CSTJSON_EXPLEXEC, message.executionDetail.toString());
+                oneMessage.put(GrummanAPI.CSTJSON_EXPLERROR, message.explanationError.toString());
             }
             // sort the detail
             MessagesFactory.sortMyList(listDetails, new String[] { GrummanAPI.CSTJSON_CASEID, GrummanAPI.CSTJSON_MESSAGENAME, GrummanAPI.CSTJSON_WID });
 
-            result.put("details", listDetails);
-            result.put(GrummanAPI.CSTJSON_PERFORMANCEMESURE, performanceMesure.getMap());
+            result.put( GrummanAPI.CSTJSON_DETAILS, listDetails);
+            result.put( GrummanAPI.CSTJSON_PERFORMANCEMESURE, performanceMesure.getMap());
 
             return result;
         }
@@ -306,7 +323,7 @@ public class ReconcilationMessage {
         int pageSize = 10;
         // we expect multiple message per result here
         reconciliationFilter.numberOfMessages = Math.max(messagesList.getNumberOfMessages(), 100);
-        List<String> listData = messagesList.getListKeysGroup() != null ? messagesList.getListKeysGroup() : messagesList.getListKeys();
+        List<String> listData = messagesList.getListKeysGroups() != null ? messagesList.getListKeysGroups() : messagesList.getListKeys();
         if (listData == null) {
             resultExecution.listEvents.add(eventSqlNoMessagesSelected);
             return resultExecution;
@@ -351,16 +368,15 @@ public class ReconcilationMessage {
                 }
 
                 // treat this one ? 
-                OperationCorr operation = null;
-                if (message.isComplete
-                        && (message.catchEventType.equals(enumCatchEventType.TASKMESSAGE) || message.catchEventType.equals(enumCatchEventType.CATCHMESSAGEEVENT))
-                        && messagesList.isExecutecomplete()) {
-                    operation = new OperationCorrExecuteMessage();
-                }
-                if ((!message.isComplete) && messagesList.isSendincomplete()) {
-                    operation = new OperationCorrSendCompleteMessage();
+                OperationCorr operation = getOperationToSolvedMessage(message);
 
-                }
+                // according to the user, we may invalidate some operations
+                if (operation instanceof OperationCorrExecuteMessage && !messagesList.isExecutecomplete() )
+                    operation=null;
+                if (operation instanceof OperationCorrSendCompleteMessage && !messagesList.isSendincomplete() )
+                    operation=null;
+                
+                
                 if (operation == null)
                     continue;
 
@@ -420,7 +436,7 @@ public class ReconcilationMessage {
                     if (message.nbWaitingEvent <= nbOriginalWaitingEvent - message.nbExecutionsInProgress) {
                         message.nbExecutionsWithSuccess = message.nbExecutionsInProgress;
                         // now we have to purge the message_event
-                        ResultPurge resultPurge = messagesFactory.purgeMessageInstance(message.listIdMessageInstanceRelative, messagesList.getPurgeAllRelatives(), message.nbExecutionsWithSuccess);
+                        ResultPurge resultPurge = messagesFactory.purgeMessageInstance(message.listIdMessageInstanceRelative, messagesList.isPurgeAllRelativesId(), message.nbExecutionsWithSuccess);
 
                         message.listIdMessageInstanceRelativePurged = resultPurge.getListIdMessageInstancePurged();
                         message.setStatus(enumStatus.SENDEDANDPURGE);
@@ -439,4 +455,17 @@ public class ReconcilationMessage {
 
     }
 
+    
+    private OperationCorr getOperationToSolvedMessage(Message message) {
+        OperationCorr operation = null;
+        if (message.isComplete
+                && (message.catchEventType.equals(enumCatchEventType.TASKMESSAGE) || message.catchEventType.equals(enumCatchEventType.CATCHMESSAGEEVENT))) {
+            operation = new OperationCorrExecuteMessage();
+        }
+        if ((!message.isComplete) ) {
+            operation = new OperationCorrSendCompleteMessage();
+
+        }
+        return operation;
+    }
 }

@@ -49,7 +49,7 @@ public  @Data class Message {
     /** correlation : should be same as processName */
     private String targetProcessName;
     /** correlation : should be same as flowNodeName */
-    public String targetFlowNodeName;
+    private String targetFlowNodeName;
     
     
     /**
@@ -60,21 +60,21 @@ public  @Data class Message {
     /**
      * message don't store the process version. So, this version is calculated on the current available process on server, according the waiting event
      */
-    public String currentProcessVersion;
+    private String currentProcessVersion;
     /**
      * Message 
      */
-    public Long processDefinitionId;
+    private Long processDefinitionId;
     
     /** correlation : should be same as targetProcessName */
-    public String processName;
+    private String processName;
        
-    public String rootProcessName;
+    private String rootProcessName;
     
-    public String rootProcessVersion;
-    public Long rootProcessDefinitionId;
+    private String rootProcessVersion;
+    private Long rootProcessDefinitionId;
 
-    public Map<String, Object> waitingEvent = new HashMap<>();
+    private Map<String, Object> waitingEvent = new HashMap<>();
     public Long waitingId;
     public Long rootProcessInstanceId;
     private Long processInstanceId;
@@ -97,7 +97,7 @@ public  @Data class Message {
     /**
      * message instance part
      */
-    public Map<String, Object> messageInstance = new HashMap<>();
+    private Map<String, Object> messageInstance = new HashMap<>();
     public Long messageId;
     
     public long nbMessageInstance;
@@ -124,9 +124,10 @@ public  @Data class Message {
     public Map<String, Object> completeMessage = new HashMap<>();
     public boolean isComplete = true;
 
-    public StringBuilder incompleteDetail= new StringBuilder();
+    public StringBuilder explanationDetail= new StringBuilder();
     
     public StringBuilder executionDetail= new StringBuilder();
+    public StringBuilder explanationError= new StringBuilder();
     
     /**
      * information about the management of the message.

@@ -222,7 +222,7 @@ public class MessagesFactory {
             + " and c.CORRELATION5 = a.CORRELATION5)"
             + " and a.targetprocess = b.targetprocess "
             + " and a.targetflownode = b.targetflownode "
-            + " and (a.CORRELATION1 != 'NONE' or a.CORRELATION2 != 'NONE' or a.CORRELATION3 != 'NONE' or a.CORRELATION4 != 'NONE' or a.CORRELATION5 != 'NONE')"
+            + " and NOT (a.CORRELATION1 = 'NONE' and a.CORRELATION2 = 'NONE' and a.CORRELATION3 = 'NONE' and a.CORRELATION4 != 'NONE' or a.CORRELATION5 != 'NONE')"
             + " and a.CORRELATION1 = b.CORRELATION1 "
             + " and a.CORRELATION2 = b.CORRELATION2 "
             + " and a.CORRELATION3 = b.CORRELATION3 "
@@ -355,7 +355,7 @@ public class MessagesFactory {
                     if (i > reconciliationFilter.fromIndex)
                         filter.append(" or ");
                     filter.append("( w.processdefinitionid =(select processid from process_definition where name=? and version=?) and w.flownodename=? )");
-                    MessageKeyGroup messageKeyGroup = MessageKeyGroup.getInstanceFromKey(reconciliationFilter.messagesList.getListKeysGroup().get(i));
+                    MessageKeyGroup messageKeyGroup = MessageKeyGroup.getInstanceFromKey(reconciliationFilter.messagesList.getListKeysGroups().get(i));
                     parameters.add(messageKeyGroup.processName);
                     parameters.add(messageKeyGroup.processVersion);
                     parameters.add(messageKeyGroup.flowNodeName);
@@ -377,9 +377,9 @@ public class MessagesFactory {
                 Message message = new Message();
                 for (Entry<String, Object> entry : record.entrySet()) {
                     if (entry.getKey().startsWith("w_"))
-                        message.waitingEvent.put(entry.getKey().substring(2), entry.getValue());
+                        message.getWaitingEvent().put(entry.getKey().substring(2), entry.getValue());
                     if (entry.getKey().startsWith("m_"))
-                        message.messageInstance.put(entry.getKey().substring(2), entry.getValue());
+                        message.getMessageInstance().put(entry.getKey().substring(2), entry.getValue());
                 }
                 message.isMessageWithCorrelation = true;
                 message.setMessageName((String) record.get("w_messagename"));
@@ -465,29 +465,29 @@ public class MessagesFactory {
      */
     public List<BEvent> loadDesignContentData(Message message, ProcessAPI processAPI, Map<Long, DesignProcessDefinition> cacheDesign) {
         List<BEvent> listEvents = new ArrayList<>();
-        if (message.processDefinitionId == null || message.targetFlowNodeName == null)
+        if (message.getProcessDefinitionId() == null || message.getTargetFlowNodeName() == null)
             return listEvents;
         try {
             StringBuilder detailExecution = new StringBuilder();
 
-            DesignProcessDefinition designProcessAPI = cacheDesign.get(message.processDefinitionId);
+            DesignProcessDefinition designProcessAPI = cacheDesign.get(message.getProcessDefinitionId());
             if (designProcessAPI == null) {
                 try {
-                    designProcessAPI = processAPI.getDesignProcessDefinition(message.processDefinitionId);
+                    designProcessAPI = processAPI.getDesignProcessDefinition(message.getProcessDefinitionId());
                 } catch (ProcessDefinitionNotFoundException e) {
                     logger.severe(loggerLabel + loggerExceptionLabel + e.toString());
-                    listEvents.add(new BEvent(eventNoProcessDefinitionFound, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.currentProcessVersion + "]"));
-                    message.incompleteDetail.append(eventNoProcessDefinitionFound.toString());
+                    listEvents.add(new BEvent(eventNoProcessDefinitionFound, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.getCurrentProcessVersion() + "]"));
+                    message.explanationDetail.append(eventNoProcessDefinitionFound.toString());
                     return listEvents;
                 }
                 catch(Exception e) {
                     // error during the design loading
                     logger.severe(loggerLabel + loggerExceptionLabel + e.toString());
-                    listEvents.add(new BEvent(eventErrorLoadingDesign, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.currentProcessVersion + "]"));
-                    message.incompleteDetail.append(eventErrorLoadingDesign.toString());
+                    listEvents.add(new BEvent(eventErrorLoadingDesign, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.getCurrentProcessVersion() + "]"));
+                    message.explanationDetail.append(eventErrorLoadingDesign.toString());
                     return listEvents;
                 }
-                cacheDesign.put(message.processDefinitionId, designProcessAPI);
+                cacheDesign.put(message.getProcessDefinitionId(), designProcessAPI);
             }
 
             FlowElementContainerDefinition flowElementContainer = designProcessAPI.getFlowElementContainer();
@@ -498,11 +498,11 @@ public class MessagesFactory {
             // avoid the class cast exception
             List<CatchEventDefinition> listCatchsEvent = new ArrayList<>();
 
-            detailExecution.append("Search[" + message.targetFlowNodeName + "] activities:");
+            detailExecution.append("Search[" + message.getTargetFlowNodeName() + "] activities:");
             List<ActivityDefinition> listActivities = flowElementContainer.getActivities();
             for (ActivityDefinition activity : listActivities) {
                 detailExecution.append("[" + activity.getName() + "]");
-                if (activity.getName().equals(message.targetFlowNodeName) && activity instanceof ReceiveTaskDefinition) {
+                if (activity.getName().equals(message.getTargetFlowNodeName()) && activity instanceof ReceiveTaskDefinition) {
                     activityMessage = (ReceiveTaskDefinition) activity;
 
                     message.setCorrelations(activityMessage.getTrigger().getCorrelations());
@@ -538,7 +538,7 @@ public class MessagesFactory {
             
 
             if (!message.isDesignContentFound() ) {
-                message.incompleteDetail = detailExecution;
+                message.explanationDetail = detailExecution;
                 return listEvents;
             }
 
@@ -561,8 +561,8 @@ public class MessagesFactory {
             String exceptionDetails = sw.toString();
 
             logger.severe(loggerLabel + loggerExceptionLabel + e.toString()+" at "+exceptionDetails);
-            listEvents.add(new BEvent(eventNoTriggerDefinitionFound, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.currentProcessVersion + "] FlowNodeName[" + message.targetFlowNodeName + "]"));
-            message.incompleteDetail.append("Error "+e.getMessage()+" at "+exceptionDetails);
+            listEvents.add(new BEvent(eventNoTriggerDefinitionFound, "ProcessName[" + message.getTargetProcessName() + "] Version[" + message.getCurrentProcessVersion() + "] FlowNodeName[" + message.getTargetFlowNodeName() + "]"));
+            message.explanationDetail.append("Error "+e.getMessage()+" at "+exceptionDetails);
         }
 
         return listEvents;
@@ -582,7 +582,7 @@ public class MessagesFactory {
         for (CatchEventDefinition catchEvent : listCatchsEvent) {
             detailExecution.append("[" + catchEvent.getName() + "]");
 
-            if (catchEvent.getName().equals(message.targetFlowNodeName)) {
+            if (catchEvent.getName().equals(message.getTargetFlowNodeName())) {
                 CatchMessageEventTriggerDefinition catchDefinition = getCatchMessageEventTriggerFromEvent(catchEvent);
                 if (catchDefinition != null) {
                     message.setCorrelations(catchDefinition.getCorrelations());
@@ -631,8 +631,8 @@ public class MessagesFactory {
             // how many message_instance are present
             List<Object> parameters = new ArrayList<>();
             parameters.add(message.getTargetProcessName());
-            parameters.add(message.currentProcessVersion);
-            parameters.add(message.targetFlowNodeName);
+            parameters.add(message.getCurrentProcessVersion());
+            parameters.add(message.getTargetFlowNodeName());
             for (int i = 0; i < 5; i++)
                 parameters.add(message.getValueCorrelation(i, true));
             ResultQuery resultQuery = executeOneResultQuery("correlationwaitingevent", SQLQUERY_CORRELATION_WAITINGEVENT, parameters, 0L, con);
@@ -641,7 +641,7 @@ public class MessagesFactory {
 
             parameters.clear();
             parameters.add(message.getTargetProcessName());
-            parameters.add(message.targetFlowNodeName);
+            parameters.add(message.getTargetFlowNodeName());
             for (int i = 0; i < 5; i++)
                 parameters.add(message.getValueCorrelation(i, true));
 
@@ -1053,12 +1053,12 @@ public class MessagesFactory {
                     Object key2 = null;
 
                     if (attribut.startsWith("waitingevent")) {
-                        key1 = s1.waitingEvent.get(attribut.substring("waitingevent.".length()));
-                        key2 = s2.waitingEvent.get(attribut.substring("waitingevent.".length()));
+                        key1 = s1.getWaitingEvent().get(attribut.substring("waitingevent.".length()));
+                        key2 = s2.getWaitingEvent().get(attribut.substring("waitingevent.".length()));
                     }
                     if (attribut.startsWith("messageinstance")) {
-                        key1 = s1.messageInstance.get(attribut.substring("messageinstance.".length()));
-                        key2 = s2.messageInstance.get(attribut.substring("messageinstance.".length()));
+                        key1 = s1.getMessageInstance().get(attribut.substring("messageinstance.".length()));
+                        key2 = s2.getMessageInstance().get(attribut.substring("messageinstance.".length()));
                     }
 
                     if (key1 == null)

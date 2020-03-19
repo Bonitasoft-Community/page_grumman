@@ -23,8 +23,28 @@ public abstract class OperationCorr {
     public @Data static class ResultOperationCorr {
         List<BEvent>  listEvents = new ArrayList<>();;
         StringBuilder explanations = new StringBuilder();
+        /**
+         * if no error are detected, result is empty
+         */
+        StringBuilder errorsDetected= new StringBuilder();
+        public boolean isError() {
+            return errorsDetected.length()>0;
+        }
         
     }
+    /** retrieve the error in the message. 
+     * Note: the detection may update the message to keep track of the analysis
+     * 
+     * @return
+     */
+    public abstract ResultOperationCorr detectErrorInMessage( Message message, ProcessAPI porcessAPI);
+    
+    /**
+     * Execute a correction on the message
+     * @param message
+     * @param processAPI
+     * @return
+     */
     public abstract ResultOperationCorr operation(Message message, ProcessAPI processAPI);
     
     

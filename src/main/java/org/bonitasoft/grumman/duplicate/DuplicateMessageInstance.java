@@ -24,7 +24,7 @@ import lombok.Data;
 
 public class DuplicateMessageInstance {
     
-    private final static Logger logger = Logger.getLogger(MessagesFactory.class.getName());
+    private final static Logger logger = Logger.getLogger(DuplicateMessageInstance.class.getName());
 
     private static String loggerLabel = "DuplicateMessageInstance ##";
 
