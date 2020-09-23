@@ -35,6 +35,15 @@ public class ReconcilationMessage {
     private final static BEvent eventSqlNoMessagesSelected = new BEvent(ReconcilationMessage.class.getName(), 1, Level.APPLICATIONERROR, "No messages selected", "Select minimum one message", "", "Select one message");
     private final static BEvent eventOperationCorrectionFailed = new BEvent(ReconcilationMessage.class.getName(), 2, Level.ERROR, "Operation Correction failed", "Operation to correct a message failed", "The message can't be executed", "Check exception");
 
+    
+    ProcessAPI processAPI;
+    long tenantId;
+
+    public ReconcilationMessage(ProcessAPI processAPI, long tenantId) {
+        this.processAPI = processAPI;
+        this.tenantId = tenantId;
+    }
+    
     public @Data static class ResultMessageOperation {
 
         protected List<BEvent> listEvents = new ArrayList<>();
@@ -162,9 +171,9 @@ public class ReconcilationMessage {
      * 
      * @return
      */
-    public ResultMessageOperation getListIncompleteMessage(ReconcialiationFilter reconciliationFilter, ProcessAPI processAPI) {
+    public ResultMessageOperation getListIncompleteMessage(ReconcialiationFilter reconciliationFilter) {
         ResultMessageOperation result = new ResultMessageOperation();
-        MessagesFactory messagesFactory = new MessagesFactory();
+        MessagesFactory messagesFactory = new MessagesFactory(tenantId);
 
         PerformanceMesure perf = result.performanceMesure.getMesure(GrummanAPI.CSTJSON_PERFORMANCEMESURETOTAL);
         perf.start();
@@ -310,9 +319,9 @@ public class ReconcilationMessage {
     /**
      * @return
      */
-    public ResultExecution executeIncompleteMessage(MessagesList messagesList, ProcessAPI processAPI) {
+    public ResultExecution executeIncompleteMessage(MessagesList messagesList) {
         ResultExecution resultExecution = new ResultExecution();
-        MessagesFactory messagesFactory = new MessagesFactory();
+        MessagesFactory messagesFactory = new MessagesFactory(tenantId);
         PerformanceMesure perf = resultExecution.performanceMesure.getMesure(GrummanAPI.CSTJSON_PERFORMANCEMESURETOTAL);
         perf.start();
 
@@ -338,7 +347,7 @@ public class ReconcilationMessage {
             if (reconciliationFilter.toIndex > listData.size())
                 reconciliationFilter.toIndex = listData.size();
 
-            ResultMessageOperation resultOperation = getListIncompleteMessage(reconciliationFilter, processAPI);
+            ResultMessageOperation resultOperation = getListIncompleteMessage(reconciliationFilter);
             resultExecution.listEvents.addAll(resultOperation.listEvents);
             resultExecution.performanceMesure.add(resultOperation.performanceMesure);
 

@@ -23,6 +23,14 @@ public class PurgeTablesMessage {
 
     private static final String CSTJSON_PERFORMANCEMESURETOTAL = "total";
 
+    ProcessAPI processAPI;
+    long tenantId;
+
+    public PurgeTablesMessage(ProcessAPI processAPI, long tenantId) {
+        this.processAPI = processAPI;
+        this.tenantId = tenantId;
+    }
+    
     private static class Query {
 
         protected String sqlQueryCount;
@@ -93,12 +101,12 @@ public class PurgeTablesMessage {
      * @param processAPI
      * @return
      */
-    public ResultPurge getListMonitoringItems(ProcessAPI processAPI) {
+    public ResultPurge getListMonitoringItems() {
         ResultPurge resultPurge = new ResultPurge();
         PerformanceMesure perf = resultPurge.performanceMesure.getMesure(CSTJSON_PERFORMANCEMESURETOTAL);
         perf.start();
      
-        MessagesFactory messagesFactory = new MessagesFactory();
+        MessagesFactory messagesFactory = new MessagesFactory( tenantId );
         try (Connection con = MessagesFactory.getConnection();) {
 
             for (Query query : listQueries) {
@@ -123,12 +131,12 @@ public class PurgeTablesMessage {
      * @param processAPI
      * @return
      */
-    public ResultPurge updateListMonitoringItems(ProcessAPI processAPI) {
+    public ResultPurge updateListMonitoringItems() {
         ResultPurge resultPurge = new ResultPurge();
         PerformanceMesure perf = resultPurge.performanceMesure.getMesure(CSTJSON_PERFORMANCEMESURETOTAL);
         perf.start();
      
-        MessagesFactory messagesFactory = new MessagesFactory();
+        MessagesFactory messagesFactory = new MessagesFactory(tenantId);
         try (Connection con = MessagesFactory.getConnection();) {
 
             for (Query query : listQueries) {

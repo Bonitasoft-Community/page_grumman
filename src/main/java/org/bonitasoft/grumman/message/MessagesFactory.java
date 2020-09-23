@@ -43,6 +43,7 @@ import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.Reconcialiatio
 import org.bonitasoft.grumman.reconciliation.ReconcilationMessage.ReconcialiationFilter.TYPEFILTER;
 import org.bonitasoft.log.event.BEvent;
 import org.bonitasoft.log.event.BEvent.Level;
+import org.bonitasoft.properties.BonitaEngineConnection;
 import org.bonitasoft.log.event.BEventFactory;
 
 import lombok.Data;
@@ -67,8 +68,8 @@ public class MessagesFactory {
     /* getSynthesis */
     /*                                                                      */
     /* -------------------------------------------------------------------- */
-    protected final static String SQLQUERY_COUNT_WAITINGEVENT = "select count(*) as nbevents from waiting_event";
-    protected final static String SQLQUERY_COUNT_MESSAGEINSTANCE = "select count(*) as nbinstances from message_instance";
+    protected final static String SQLQUERY_COUNT_WAITINGEVENT = "select count(*) as nbevents from waiting_event where tenantid=?";
+    protected final static String SQLQUERY_COUNT_MESSAGEINSTANCE = "select count(*) as nbinstances from message_instance where tenantid=?";
     protected final static String SQLQUERY_COUNT_RECONCILIATION = "select distinct count(*) " +
             "from " +
             "waiting_event w, " +
@@ -108,12 +109,12 @@ public class MessagesFactory {
             " m.locked as m_locked, m.handled as m_handled " +
             
             " from waiting_event w " +
-            " left join flownode_instance fi on (w.flownodeinstanceid = fi.id) " +
-            " left join process_instance piroot on (piroot.id = w.rootprocessinstanceid) " +
-            " left join process_definition pdroot on (piroot.processdefinitionid = pdroot.processid) " +
-            " left join process_instance pimessage on (pimessage.id = w.parentprocessinstanceid) " +
+            " left join flownode_instance fi on (w.flownodeinstanceid = fi.id and fi.tenantid = w.tenantid) " +
+            " left join process_instance piroot on (piroot.id = w.rootprocessinstanceid and piroot.tenantid = w.tenantid) " +
+            " left join process_definition pdroot on (piroot.processdefinitionid = pdroot.processid and pdroot.tenantid = w.tenantid ) " +
+            " left join process_instance pimessage on (pimessage.id = w.parentprocessinstanceid and pi.message = w.tenantid ) " +
             // link the pdMessage with the w.processfinitionid (not the pi, which not exist for a startevent
-            " left join process_definition pdmessage on (w.processdefinitionid = pdmessage.processid), " +
+            " left join process_definition pdmessage on (w.processdefinitionid = pdmessage.processid and pdmessage.tenantid = w.tenantid ), " +
             // " left join process_definition pdmessage on (pimessage.processdefinitionid = pdmessage.processid), " +
             " message_instance m " +
             " where m.locked = 0 AND w.locked = 0 and w.active = 1" +
@@ -125,12 +126,14 @@ public class MessagesFactory {
             " and w.CORRELATION2 = m.CORRELATION2 " +
             " and w.CORRELATION3 = m.CORRELATION3 " +
             " and w.CORRELATION4 = m.CORRELATION4 " +
-            " and w.CORRELATION5 = m.CORRELATION5 ";
+            " and w.CORRELATION5 = m.CORRELATION5 " + 
+            " and w.tenantid = m.tenantid " +
+            " and w.tenantid = ? ";
 
     protected final static String SQLQUERY_RECONCILIATION_FILTERKEY = " and w.id in (?)";
     protected final static String SQLQUERY_RECONCILIATION_ORDER = " order by w_lastupdatedate";
 
-    protected final static String SQLQUERY_LOADMESSAGE_CONTENT = "select * from data_instance where containertype='MESSAGE_INSTANCE' and containerid=?";
+    protected final static String SQLQUERY_LOADMESSAGE_CONTENT = "select * from data_instance where containertype='MESSAGE_INSTANCE' and containerid=? and tenantid=?";
 
     protected final static String SQLQUERY_CORRELATION_WAITINGEVENT = "select count(id) " +
             " from waiting_event w " +
@@ -141,7 +144,8 @@ public class MessagesFactory {
             " and w.CORRELATION2 = ? " +
             " and w.CORRELATION3 = ? " +
             " and w.CORRELATION4 = ? " +
-            " and w.CORRELATION5 = ? ";
+            " and w.CORRELATION5 = ? " +
+            " and w.tenantid = ? ";
     protected final static String SQLQUERY_COUNT_CORRELATION_MESSAGEINSTANCE = "select count(id) " +
             " from message_instance m " +
             " where " +
@@ -151,7 +155,8 @@ public class MessagesFactory {
             " and m.CORRELATION2 = ? " +
             " and m.CORRELATION3 = ? " +
             " and m.CORRELATION4 = ? " +
-            " and m.CORRELATION5 = ? ";
+            " and m.CORRELATION5 = ? " +
+            " and m.tenantid = ? ";
     protected final static String SQLQUERY_CORRELATION_MESSAGEINSTANCE = "select * " +
             " from message_instance m " +
             " where " +
@@ -161,10 +166,11 @@ public class MessagesFactory {
             " and m.CORRELATION2 = ? " +
             " and m.CORRELATION3 = ? " +
             " and m.CORRELATION4 = ? " +
-            " and m.CORRELATION5 = ? ";
+            " and m.CORRELATION5 = ? "+
+            " and m.tenantid = ? ";
 
-    protected final static String SQLUPDATE_PURGE_MESSAGEDATA = "delete data_instance where containertype='MESSAGE_INSTANCE' and containerid=?";
-    protected final static String SQLUPDATE_PURGE_MESSAGE = "delete message_instance where id=?";
+    protected final static String SQLUPDATE_PURGE_MESSAGEDATA = "delete data_instance where containertype='MESSAGE_INSTANCE' and containerid=? and tenantid=?";
+    protected final static String SQLUPDATE_PURGE_MESSAGE = "delete message_instance where id=? and tenantid=?";
 
     /* -------------------------------------------------------------------- */
     /*                                                                      */
@@ -244,6 +250,11 @@ public class MessagesFactory {
             + " and a.CORRELATION5 = b.CORRELATION5 "
             + ")";
 
+    private long tenantId;
+    public MessagesFactory( long tenantId) {
+        this.tenantId = tenantId;
+    }
+    
     public @Data class SynthesisOnMessage {
 
         private long nbWaitingEvent;
@@ -275,7 +286,10 @@ public class MessagesFactory {
         try (Connection con = getConnection();) {
             ResultQuery result;
 
-            result = executeOneResultQuery("waitingevent", SQLQUERY_COUNT_WAITINGEVENT, null, 0L, con);
+            List<Object> parameters= new ArrayList<>();
+            parameters.add( tenantId );
+            
+            result = executeOneResultQuery("waitingevent", SQLQUERY_COUNT_WAITINGEVENT, parameters, 0L, con);
             synthesisOnMessage.listEvents.addAll(result.listEvents);
             synthesisOnMessage.nbWaitingEvent = getLong(result.oneResult, 0L);
 
@@ -330,9 +344,10 @@ public class MessagesFactory {
 
             ResultQuery resultQuery;
             List<Object> parameters = new ArrayList<>();
+            parameters.add( tenantId );
             if (reconciliationFilter.typeFilter == TYPEFILTER.MAXMESSAGES) {
                 sqlQuery = SQLQUERY_RECONCILIATION_BASE + SQLQUERY_RECONCILIATION_ORDER;
-                resultQuery = executeListResultQuery("reconciliation", SQLQUERY_RECONCILIATION_BASE + SQLQUERY_RECONCILIATION_ORDER, null, reconciliationFilter.numberOfMessages, "w_id", con);
+                resultQuery = executeListResultQuery("reconciliation", SQLQUERY_RECONCILIATION_BASE + SQLQUERY_RECONCILIATION_ORDER, parameters, reconciliationFilter.numberOfMessages, "w_id", con);
                 resultOperation.numberOfMessages = resultQuery.numberOfDiffAttributes;
 
             } else if (reconciliationFilter.typeFilter == TYPEFILTER.MESSAGEKEY) {
@@ -354,7 +369,7 @@ public class MessagesFactory {
                 for (int i = reconciliationFilter.fromIndex; i < reconciliationFilter.toIndex; i++) {
                     if (i > reconciliationFilter.fromIndex)
                         filter.append(" or ");
-                    filter.append("( w.processdefinitionid =(select processid from process_definition where name=? and version=?) and w.flownodename=? )");
+                    filter.append("( w.processdefinitionid =(select pd.processid from process_definition pd where pd.name=? and pd.version=? and tenantid=w.tenantid) and w.flownodename=? )");
                     MessageKeyGroup messageKeyGroup = MessageKeyGroup.getInstanceFromKey(reconciliationFilter.messagesList.getListKeysGroups().get(i));
                     parameters.add(messageKeyGroup.processName);
                     parameters.add(messageKeyGroup.processVersion);
@@ -439,7 +454,10 @@ public class MessagesFactory {
         List<BEvent> listEvents = new ArrayList<>();
 
         try (Connection con = getConnection();) {
-            ResultQuery resultQuery = executeListResultQuery("messagecontentdata", SQLQUERY_LOADMESSAGE_CONTENT, Arrays.asList(message.messageId), 100, null, con);
+            List<Object> parameters = new ArrayList();
+            parameters.add( message.messageId);
+            parameters.add( tenantId );
+            ResultQuery resultQuery = executeListResultQuery("messagecontentdata", SQLQUERY_LOADMESSAGE_CONTENT, parameters, 100, null, con);
             listEvents.addAll(resultQuery.listEvents);
             for (Map<String, Object> record : resultQuery.getListResult()) {
                 Object value = null;
@@ -635,6 +653,8 @@ public class MessagesFactory {
             parameters.add(message.getTargetFlowNodeName());
             for (int i = 0; i < 5; i++)
                 parameters.add(message.getValueCorrelation(i, true));
+            parameters.add( tenantId );
+            
             ResultQuery resultQuery = executeOneResultQuery("correlationwaitingevent", SQLQUERY_CORRELATION_WAITINGEVENT, parameters, 0L, con);
             message.nbWaitingEvent = getLong(resultQuery.oneResult, 0L);
             listEvents.addAll(resultQuery.listEvents);
@@ -644,6 +664,7 @@ public class MessagesFactory {
             parameters.add(message.getTargetFlowNodeName());
             for (int i = 0; i < 5; i++)
                 parameters.add(message.getValueCorrelation(i, true));
+            parameters.add( tenantId );
 
             resultQuery = executeListResultQuery("correlationmessageinstance", SQLQUERY_CORRELATION_MESSAGEINSTANCE, parameters, 10000, null, con);
             listEvents.addAll(resultQuery.listEvents);
@@ -710,15 +731,16 @@ public class MessagesFactory {
                 count++;
 
                 parameters.clear();
-                parameters.add(id);
+                parameters.add( id );
+                parameters.add( tenantId );
 
                 query = SQLUPDATE_PURGE_MESSAGEDATA;
-                ResultQuery resultQuery = executeUpdateQuery("purgemessagedata", SQLUPDATE_PURGE_MESSAGEDATA, parameters, con, false);
+                ResultQuery resultQuery = executeUpdateQuery("purgemessagedata", query, parameters, con, false);
                 resultPurge.nbDatasRowDeleted += resultQuery.numberOfRows;
                 resultPurge.listEvents.addAll(resultQuery.listEvents);
 
                 query = SQLUPDATE_PURGE_MESSAGE;
-                resultQuery = executeUpdateQuery("purgemessage", SQLUPDATE_PURGE_MESSAGE, parameters, con, false);
+                resultQuery = executeUpdateQuery("purgemessage", query, parameters, con, false);
                 resultPurge.nbMessagesRowDeleted += resultQuery.numberOfRows;
                 resultPurge.listEvents.addAll(resultQuery.listEvents);
                 resultPurge.listIdMessageInstancePurged.add(id);
@@ -902,28 +924,7 @@ public class MessagesFactory {
      */
     public static Connection getConnection() throws SQLException {
         // ".getDataSourceConnection() start"
-
-        StringBuilder msg = new StringBuilder();
-        List<String> listDatasourceToCheck = new ArrayList<>();
-        for (String dataSourceString : listDataSources)
-            listDatasourceToCheck.add(dataSourceString);
-
-        for (String dataSourceString : listDatasourceToCheck) {
-            // .getDataSourceConnection() check[" + dataSourceString + "]"
-            try {
-                final Context ctx = new InitialContext();
-                final DataSource dataSource = (DataSource) ctx.lookup(dataSourceString);
-                // .getDataSourceConnection() [" + dataSourceString + "] isOk"
-                return dataSource.getConnection();
-
-            } catch (NamingException e) {
-                logger.info(
-                        loggerLabel + ".getDataSourceConnection() error[" + dataSourceString + "] : " + e.toString());
-                msg.append("DataSource[" + dataSourceString + "] : error " + e.toString() + ";");
-            }
-        }
-        logger.severe(loggerLabel + ".getDataSourceConnection: Can't found a datasource : " + msg.toString());
-        return null;
+        return BonitaEngineConnection.getConnection();
     }
 
     /* -------------------------------------------------------------------- */

@@ -33,6 +33,15 @@ public class DuplicateMessageInstance {
 
     private String[] idToExport = {"id", "messagename", "targetprocess", "targetflownode" };
     
+    
+    ProcessAPI processAPI;
+    long tenantId;
+
+    public DuplicateMessageInstance(ProcessAPI processAPI, long tenantId) {
+        this.processAPI = processAPI;
+        this.tenantId = tenantId;
+    }
+
     /**
      * Result classes
      */
@@ -105,10 +114,10 @@ public class DuplicateMessageInstance {
      * @param processAPI
      * @return
      */
-    public ResultDuplicate getListDuplicateMessages(int maximumNumberOfDuplications, ProcessAPI processAPI) {
+    public ResultDuplicate getListDuplicateMessages(int maximumNumberOfDuplications) {
 
         ResultDuplicate resultDuplicate = new ResultDuplicate();
-        MessagesFactory messagesFactory = new MessagesFactory();
+        MessagesFactory messagesFactory = new MessagesFactory(tenantId);
         PerformanceMesure perf = resultDuplicate.performanceMesure.getMesure( GrummanAPI.CSTJSON_PERFORMANCEMESURETOTAL);
         perf.start();
         try (Connection con = MessagesFactory.getConnection();) {
@@ -179,13 +188,13 @@ public class DuplicateMessageInstance {
      * @param processAPI
      * @return
      */
-    public ResultPurgeDuplicate deleteDuplicateMessages(MessagesIdList listIdToPurge, ProcessAPI processAPI) {
+    public ResultPurgeDuplicate deleteDuplicateMessages(MessagesIdList listIdToPurge) {
         ResultPurgeDuplicate resultPurgeDuplicate = new ResultPurgeDuplicate();
         PerformanceMesure perf = resultPurgeDuplicate.performanceMesure.getMesure( GrummanAPI.CSTJSON_PERFORMANCEMESURETOTAL);
         perf.start();
 
-        MessagesFactory messagesFactory = new MessagesFactory();
-        try (Connection con = MessagesFactory.getConnection();) {
+        MessagesFactory messagesFactory = new MessagesFactory( tenantId);
+        try {
 
             ResultPurge resultPurge =  messagesFactory.purgeMessageInstance( listIdToPurge.listIds, true, 0);
     

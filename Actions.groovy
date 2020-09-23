@@ -45,9 +45,12 @@ import org.bonitasoft.engine.identity.User;
 import org.bonitasoft.engine.search.SearchOptionsBuilder;
 import org.bonitasoft.engine.search.SearchResult;
 import org.bonitasoft.engine.service.TenantServiceSingleton
-import org.bonitasoft.console.common.server.page.PageContext
-import org.bonitasoft.console.common.server.page.PageController
-import org.bonitasoft.console.common.server.page.PageResourceProvider
+
+import org.bonitasoft.web.extension.page.PageContext;
+import org.bonitasoft.web.extension.page.PageController;
+import org.bonitasoft.web.extension.page.PageResourceProvider;
+
+
 import org.bonitasoft.engine.exception.AlreadyExistsException;
 import org.bonitasoft.engine.exception.BonitaHomeNotSetException;
 import org.bonitasoft.engine.exception.CreationException;
@@ -132,8 +135,8 @@ public class Actions {
             HttpSession httpSession = request.getSession();            
             ProcessAPI processAPI = TenantAPIAccessor.getProcessAPI(apiSession);
             IdentityAPI identityAPI = TenantAPIAccessor.getIdentityAPI(apiSession);
-            GrummanAPI grummanAPI = new GrummanAPI( processAPI );
             long tenantId = apiSession.getTenantId();          
+            GrummanAPI grummanAPI = new GrummanAPI( processAPI,tenantId );
             TenantServiceAccessor tenantServiceAccessor = TenantServiceSingleton.getInstance(tenantId);             
 
                 
@@ -150,7 +153,7 @@ public class Actions {
             {
                 int numberOfMessages =  Integer.parseInt( request.getParameter("numberofmessages"));
 
-                actionAnswer.setResponse( grummanAPI.getIncompleteReconciliationMessage( numberOfMessages, processAPI));
+                actionAnswer.setResponse( grummanAPI.getIncompleteReconciliationMessage( numberOfMessages));
             }
             
             else if ("collect_reset".equals(action))
@@ -181,28 +184,28 @@ public class Actions {
                 String accumulateJson = (String) httpSession.getAttribute("accumulate" );
                 logger.info("collect_finish json=["+accumulateJson+"] ");
                 MessagesList messagesList = MessagesList.getInstanceFromJson( accumulateJson );
-                actionAnswer.setResponse( grummanAPI.sendIncompleteReconcialiationMessage( messagesList, processAPI));
+                actionAnswer.setResponse( grummanAPI.sendIncompleteReconcialiationMessage( messagesList ));
             }
             else if ("getpurgetablesmonitoring".equals(action))
             {
-                actionAnswer.setResponse( grummanAPI.getPurgeTablesMonitoring( processAPI));
+                actionAnswer.setResponse( grummanAPI.getPurgeTablesMonitoring( ));
             }
             else if ("purgetablesmonitoring".equals(action))
             {
-                actionAnswer.setResponse( grummanAPI.purgeTablesMonitoring( processAPI));
+                actionAnswer.setResponse( grummanAPI.purgeTablesMonitoring( ));
             }
             else if ("getlistduplicatemessages".equals(action))
             {
                 int maximumNumberOfDuplications =  Integer.parseInt( request.getParameter("maximumnumberofduplications"));
                 
-                actionAnswer.setResponse( grummanAPI.getListDuplicateMessages(maximumNumberOfDuplications, processAPI));
+                actionAnswer.setResponse( grummanAPI.getListDuplicateMessages(maximumNumberOfDuplications));
             }
             else if ("deleteduplicatemessages".equals(action))
             {
                 String accumulateJson = (String) httpSession.getAttribute("accumulate" );
                 logger.info("collect_finish json=["+accumulateJson+"] ");
                 MessagesIdList listIds = MessagesIdList.getInstanceFromJson( accumulateJson );
-                actionAnswer.setResponse( grummanAPI.deleteDuplicateMessages(listIds, processAPI));
+                actionAnswer.setResponse( grummanAPI.deleteDuplicateMessages(listIds));
             } else {
 				listEvents.add( EVENT_FAKE_ERROR);
                 actionAnswer.responseMap.put("listevents",BEventFactory.getHtml( listEvents));

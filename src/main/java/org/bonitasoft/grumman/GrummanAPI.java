@@ -82,11 +82,13 @@ public class GrummanAPI {
     
     
     ProcessAPI processAPI;
+    long tenantId;
     MessagesFactory messageFactory;
 
-    public GrummanAPI(ProcessAPI processAPI) {
+    public GrummanAPI(ProcessAPI processAPI, long tenantId) {
         this.processAPI = processAPI;
-        this.messageFactory = new MessagesFactory();
+        this.tenantId = tenantId;
+        this.messageFactory = new MessagesFactory( tenantId );
     }
 
     public Map<String, Object> getSynthesis() {
@@ -102,19 +104,19 @@ public class GrummanAPI {
     /*                                                                      */
     /* -------------------------------------------------------------------- */
 
-    public Map<String, Object> getIncompleteReconciliationMessage(int numberOfMessages, ProcessAPI processAPI) {
+    public Map<String, Object> getIncompleteReconciliationMessage(int numberOfMessages) {
         ReconcialiationFilter reconciliationFilter = new ReconcialiationFilter( TYPEFILTER.MAXMESSAGES);
         reconciliationFilter.numberOfMessages = (numberOfMessages<10 ? 10 : numberOfMessages);
         
-        ResultMessageOperation resultMessageOperation =  getIncompleteReconciliationMessage( reconciliationFilter, processAPI);
+        ResultMessageOperation resultMessageOperation =  getIncompleteReconciliationMessage( reconciliationFilter);
         return resultMessageOperation.getGroupByMap();
         
 
     }
     
-    public ResultMessageOperation getIncompleteReconciliationMessage(ReconcialiationFilter reconciliationFilter, ProcessAPI processAPI) {
-        ReconcilationMessage reconciliation = new ReconcilationMessage();
-        return reconciliation.getListIncompleteMessage(reconciliationFilter, processAPI);
+    public ResultMessageOperation getIncompleteReconciliationMessage(ReconcialiationFilter reconciliationFilter) {
+        ReconcilationMessage reconciliation = new ReconcilationMessage(processAPI, tenantId);
+        return reconciliation.getListIncompleteMessage(reconciliationFilter);
         
     }
     
@@ -187,13 +189,13 @@ public class GrummanAPI {
      * @param processAPI
      * @return
      */
-    public Map<String, Object> sendIncompleteReconcialiationMessage( MessagesList messagesList, ProcessAPI processAPI) {
-        return executeReconcialiationMessage( messagesList, processAPI).getMap();
+    public Map<String, Object> sendIncompleteReconcialiationMessage( MessagesList messagesList) {
+        return executeReconcialiationMessage( messagesList).getMap();
     }
 
-    public ResultExecution executeReconcialiationMessage( MessagesList messagesList, ProcessAPI processAPI) {
-        ReconcilationMessage reconciliation = new ReconcilationMessage();
-        return reconciliation.executeIncompleteMessage( messagesList, processAPI);
+    public ResultExecution executeReconcialiationMessage( MessagesList messagesList) {
+        ReconcilationMessage reconciliation = new ReconcilationMessage(processAPI, tenantId);
+        return reconciliation.executeIncompleteMessage( messagesList);
     }
 
     
@@ -202,14 +204,14 @@ public class GrummanAPI {
      * @param processAPI
      * @return
      */
-    public Map<String, Object> getPurgeTablesMonitoring( ProcessAPI processAPI) {
-        PurgeTablesMessage purgeTable = new PurgeTablesMessage();
-        return purgeTable.getListMonitoringItems(processAPI).getMap();
+    public Map<String, Object> getPurgeTablesMonitoring( ) {
+        PurgeTablesMessage purgeTable = new PurgeTablesMessage(processAPI, tenantId);
+        return purgeTable.getListMonitoringItems().getMap();
     }
     
-    public Map<String, Object> purgeTablesMonitoring( ProcessAPI processAPI) {
-        PurgeTablesMessage purgeTable = new PurgeTablesMessage();
-        return purgeTable.updateListMonitoringItems(processAPI).getMap();
+    public Map<String, Object> purgeTablesMonitoring( ) {
+        PurgeTablesMessage purgeTable = new PurgeTablesMessage(processAPI, tenantId);
+        return purgeTable.updateListMonitoringItems().getMap();
 
     }
 
@@ -248,14 +250,14 @@ public class GrummanAPI {
      * @param processAPI
      * @return
      */
-    public Map<String, Object> getListDuplicateMessages( int maximumNmberOfDuplications, ProcessAPI processAPI) {
-        DuplicateMessageInstance duplicateMessages = new DuplicateMessageInstance();
-        return duplicateMessages.getListDuplicateMessages(maximumNmberOfDuplications, processAPI).getMap();
+    public Map<String, Object> getListDuplicateMessages( int maximumNmberOfDuplications) {
+        DuplicateMessageInstance duplicateMessages = new DuplicateMessageInstance(processAPI, tenantId);
+        return duplicateMessages.getListDuplicateMessages(maximumNmberOfDuplications).getMap();
     }
     
-    public Map<String, Object> deleteDuplicateMessages(MessagesIdList listIds,  ProcessAPI processAPI) {
-        DuplicateMessageInstance duplicateMessages = new DuplicateMessageInstance();
-        return duplicateMessages.deleteDuplicateMessages(listIds,processAPI).getMap();
+    public Map<String, Object> deleteDuplicateMessages(MessagesIdList listIds) {
+        DuplicateMessageInstance duplicateMessages = new DuplicateMessageInstance(processAPI, tenantId);
+        return duplicateMessages.deleteDuplicateMessages(listIds).getMap();
 
     }
 
