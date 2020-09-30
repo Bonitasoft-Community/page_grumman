@@ -7,7 +7,7 @@
 	</properties>
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.bonitasoft.custompage</groupId>
-	<artifactId>CustomPageGrumman</artifactId>
+	<artifactId>bonita-grumman</artifactId>
 	<version>1.2.0</version>
 	
 	<dependencies>
