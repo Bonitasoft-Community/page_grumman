@@ -6,7 +6,7 @@
 (function() {
 
 
-var appCommand = angular.module('grummanmonitor', ['googlechart', 'ui.bootstrap','ngSanitize', 'ngModal', 'ngMaterial']);
+var appCommand = angular.module('grummanmonitor', ['googlechart', 'ui.bootstrap','ngSanitize', 'ngModal', 'ngMaterial',  'ngCookies']);
 
 
 /* Material : for the autocomplete
@@ -30,7 +30,7 @@ var appCommand = angular.module('grummanmonitor', ['googlechart', 'ui.bootstrap'
 
 // grumman the server
 appCommand.controller('GrummanControler',
-	function ( $http, $scope,$sce,$filter ) {
+	function ( $http, $scope,$sce,$filter, $cookies ) {
 
 	this.listevents='';
 	this.inprogress=false;
@@ -58,7 +58,17 @@ appCommand.controller('GrummanControler',
 	//  									General tool
 	// -----------------------------------------------------------------------------------------
 
-
+	this.getHttpConfig = function () {
+		var additionalHeaders = {};
+		var csrfToken = $cookies.get('X-Bonita-API-Token');
+		if (csrfToken) {
+			additionalHeaders ['X-Bonita-API-Token'] = csrfToken;
+		}
+		var config= {"headers": additionalHeaders};
+		console.log("GetHttpConfig : "+angular.toJson( config));
+		return config;
+	}
+	
 	this.selectMessage = function( selection, listmessages ) 
 	{
 		console.log("selectMessage="+selection+" length="+listmessages.length);
@@ -108,7 +118,7 @@ appCommand.controller('GrummanControler',
 		// 7.6 : the server force a cache on all URL, so to bypass the cache, then create a different URL
 		var d = new Date();
 		
-		$http.get( '?page=custompage_grumman&action=synthesis&t='+d.getTime() )
+		$http.get( '?page=custompage_grumman&action=synthesis&t='+d.getTime(), this.getHttpConfig() )
 				.success( function ( jsonResult, statusHttp, headers, config ) {
 					// connection is lost ?
 					if (statusHttp==401 || typeof jsonResult === 'string') {
@@ -147,7 +157,7 @@ appCommand.controller('GrummanControler',
 		// 7.6 : the server force a cache on all URL, so to bypass the cache, then create a different URL
 		var d = new Date();
 		
-		$http.get( '?page=custompage_grumman&action=incompletereconciliationmessage&numberofmessages='+this.reconciliationmsg.numberofmessages+'&t='+d.getTime() )
+		$http.get( '?page=custompage_grumman&action=incompletereconciliationmessage&numberofmessages='+this.reconciliationmsg.numberofmessages+'&t='+d.getTime(), this.getHttpConfig() )
 				.success( function ( jsonResult, statusHttp, headers, config ) {
 					// connection is lost ?
 					if (statusHttp==401 || typeof jsonResult === 'string') {
@@ -276,7 +286,7 @@ appCommand.controller('GrummanControler',
 		// 7.6 : the server force a cache on all URL, so to bypass the cache, then create a different URL
 		var d = new Date();
 		
-		$http.get( '?page=custompage_grumman&action=getpurgetablesmonitoring&t='+d.getTime() )
+		$http.get( '?page=custompage_grumman&action=getpurgetablesmonitoring&t='+d.getTime(), this.getHttpConfig() )
 				.success( function ( jsonResult, statusHttp, headers, config ) {
 					// connection is lost ?
 					if (statusHttp==401 || typeof jsonResult === 'string') {
@@ -302,7 +312,7 @@ appCommand.controller('GrummanControler',
 		// 7.6 : the server force a cache on all URL, so to bypass the cache, then create a different URL
 		var d = new Date();
 		
-		$http.get( '?page=custompage_grumman&action=purgetablesmonitoring&t='+d.getTime() )
+		$http.get( '?page=custompage_grumman&action=purgetablesmonitoring&t='+d.getTime(), this.getHttpConfig() )
 				.success( function ( jsonResult, statusHttp, headers, config ) {
 					// connection is lost ?
 					if (statusHttp==401 || typeof jsonResult === 'string') {
@@ -337,7 +347,7 @@ appCommand.controller('GrummanControler',
 		// 7.6 : the server force a cache on all URL, so to bypass the cache, then create a different URL
 		var d = new Date();
 		
-		$http.get( '?page=custompage_grumman&action=getlistduplicatemessages&maximumnumberofduplications='+this.duplicationmsg.maximumnumberofduplications+'&t='+d.getTime() )
+		$http.get( '?page=custompage_grumman&action=getlistduplicatemessages&maximumnumberofduplications='+this.duplicationmsg.maximumnumberofduplications+'&t='+d.getTime(), this.getHttpConfig() )
 				.success( function ( jsonResult, statusHttp, headers, config ) {
 					// connection is lost ?
 					if (statusHttp==401 || typeof jsonResult === 'string') {
@@ -478,7 +488,7 @@ appCommand.controller('GrummanControler',
 		console.log(" Call "+self.sendPost.listUrlsIndex+" : "+self.sendPost.listUrls[ self.sendPost.listUrlsIndex ]);
 		self.sendPost.percent= Math.round( (100 *  self.sendPost.listUrlsIndex) / self.sendPost.listUrls.length);
 		
-		$http.get( '?page=custompage_grumman&'+self.sendPost.listUrls[ self.sendPost.listUrlsIndex ]+'&t='+Date.now() )
+		$http.get( '?page=custompage_grumman&'+self.sendPost.listUrls[ self.sendPost.listUrlsIndex ]+'&t='+Date.now(), this.getHttpConfig() )
 			.success( function ( jsonResult, statusHttp, headers, config ) {
 					
 				// connection is lost ?
@@ -603,7 +613,7 @@ appCommand.controller('GrummanControler',
 	
 
 	
-	<!-- Manage the event -->
+	// Manage the event 
 	this.getListEvents = function ( listevents ) {
 		return $sce.trustAsHtml(  listevents );
 	}
